@@ -76,15 +76,7 @@ stack build
 stack run -- config.yaml
 ```
 
-Requires `http-tower-hs` as a sibling directory (referenced in `stack.yaml`). To use a git dependency instead, update `stack.yaml`:
-
-```yaml
-packages:
-  - .
-extra-deps:
-  - git: https://github.com/jarls-side-projects/http-tower-hs.git
-    commit: <commit-sha>
-```
+Uses [http-tower-hs](https://github.com/jarls-side-projects/http-tower-hs) as a git dependency via `stack.yaml`.
 
 ## License
 
