@@ -48,3 +48,4 @@ library:
     - http-types
     - containers
     - wai
+    - case-insensitive

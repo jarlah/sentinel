@@ -1,82 +1,169 @@
 # Sentinel
 
-Programmable infrastructure health monitoring as a single Haskell binary. Uses [http-tower-hs](https://github.com/jarls-side-projects/http-tower-hs) for composable HTTP client middleware.
+Programmable infrastructure health monitoring as a single Haskell binary. Probes your services on a schedule, tracks status, and exposes results as a JSON API.
 
-## What it does
+Built on [http-tower-hs](https://github.com/jarls-side-projects/http-tower-hs) — every outbound HTTP request flows through a composable middleware stack.
 
-Sentinel reads a YAML config file defining HTTP endpoints to monitor, probes them on a schedule with retry/timeout/logging middleware, and exposes the results as a JSON API.
-
-```
-$ sentinel config.yaml
-Sentinel starting on port 8080
-Monitoring 2 probes
-[probe:httpbin] "GET" "httpbin.org" "/get" -> 200 (156ms)
-[probe:example] "GET" "example.com" "/" -> 200 (89ms)
-```
-
-```
-$ curl localhost:8080/status
-[
-  {"name":"httpbin","status":"up","latency_ms":156.2,"error":null,"checked_at":"2026-04-04T14:58:08Z"},
-  {"name":"example","status":"up","latency_ms":89.4,"error":null,"checked_at":"2026-04-04T14:58:07Z"}
-]
-```
-
-## Configuration
+## Quick start
 
 ```yaml
+# config.yaml
 port: 8080
 
 probes:
   - name: my-app
     url: "https://myapp.example.com/health"
-    interval_seconds: 30
-    timeout_ms: 5000
-    retries: 2
-
-  - name: external-api
-    url: "https://api.example.com/status"
-    interval_seconds: 60
-    timeout_ms: 3000
-    retries: 1
 ```
 
-| Field              | Default | Description                          |
-|--------------------|---------|--------------------------------------|
-| `name`             | —       | Identifier for the probe             |
-| `url`              | —       | URL to probe                         |
-| `interval_seconds` | 30      | Seconds between probes               |
-| `timeout_ms`       | 5000    | Request timeout in milliseconds      |
-| `retries`          | 2       | Number of retries on failure         |
+```
+$ sentinel config.yaml
+Sentinel starting on port 8080
+Monitoring 1 probes
+Tracing: disabled
+[probe:my-app] "GET" "myapp.example.com" "/health" -> 200 (89ms)
+```
 
-## How it uses http-tower-hs
+```
+$ curl localhost:8080/status
+[
+  {
+    "name": "my-app",
+    "status": "up",
+    "latency_ms": 89.4,
+    "error": null,
+    "checked_at": "2026-04-04T14:58:07Z"
+  }
+]
+```
 
-Each probe gets its own middleware stack built from the config:
+Only `name` and `url` are required. Everything else is optional.
+
+## Configuration
+
+### Minimal
+
+```yaml
+probes:
+  - name: my-app
+    url: "https://myapp.example.com/health"
+```
+
+This gives each probe: User-Agent (`sentinel/0.1.0`), a unique request ID, and logging. No retry, no timeout, no validation — just a raw health check.
+
+### Full
+
+```yaml
+port: 8080
+tracing: true  # enable OpenTelemetry tracing (requires OTel SDK configured)
+
+probes:
+  - name: my-app
+    url: "https://myapp.example.com/health"
+    interval_seconds: 15
+    timeout_ms: 3000
+    retries: 3
+    follow_redirects: 5
+    expected_status: [200, 299]
+    circuit_breaker:
+      failure_threshold: 5
+      cooldown_seconds: 60
+    headers:
+      - ["Authorization", "Bearer my-secret-token"]
+      - ["Accept", "application/json"]
+
+  - name: external-api
+    url: "https://api.partner.com/v1/status"
+    interval_seconds: 60
+    timeout_ms: 10000
+    retries: 1
+    expected_status: [200, 200]
+
+  - name: redirect-check
+    url: "https://old.example.com"
+    follow_redirects: 3
+```
+
+### Config reference
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | **required** | Probe identifier (used in API responses and logs) |
+| `url` | string | **required** | URL to probe |
+| `interval_seconds` | int | 30 | Seconds between probes |
+| `timeout_ms` | int | *none* | Request timeout in milliseconds |
+| `retries` | int | *none* | Retry count with 1s constant backoff |
+| `follow_redirects` | int | *none* | Max redirect hops (301/302/303/307/308) |
+| `expected_status` | [int, int] | *none* | Accepted status code range [min, max] inclusive |
+| `circuit_breaker.failure_threshold` | int | 5 | Consecutive failures before tripping |
+| `circuit_breaker.cooldown_seconds` | int | 30 | Seconds before probing recovery |
+| `headers` | [[name, value]] | *none* | Custom headers added to every request |
+| `tracing` | bool | false | Global: enable OpenTelemetry tracing |
+
+## Middleware stack
+
+Each probe builds its own [http-tower-hs](https://github.com/jarls-side-projects/http-tower-hs) middleware stack from config. Only configured middleware is applied:
+
+```
+User-Agent ─> Request ID ─> Headers ─> Redirects ─> Retry ─> Timeout ─> Validate ─> Circuit Breaker ─> Tracing ─> Logging
+  (always)     (always)    (optional)  (optional)  (optional) (optional) (optional)    (optional)      (optional)  (always)
+```
 
 ```haskell
+-- What sentinel builds under the hood:
 client <- newClient
 let configured = client
-      |> withRetry (constantBackoff (probeRetries config) 1.0)
-      |> withTimeout (probeTimeout config)
+      |> withUserAgent "sentinel/0.1.0"
+      |> withRequestId
+      |> withHeader "Authorization" "Bearer my-token"
+      |> withFollowRedirects 5
+      |> withRetry (constantBackoff 3 1.0)
+      |> withTimeout 3000
+      |> withValidateStatus (\c -> c >= 200 && c < 300)
+      |> withCircuitBreaker cbConfig breaker
+      |> withTracing
       |> withLogging logger
 ```
 
-Retries, timeouts, and logging are handled by the middleware — the probe logic just calls `runRequest` and checks the `Either`.
+### Circuit breaker
+
+When configured, each probe gets its own circuit breaker. After `failure_threshold` consecutive failures, the breaker trips open and immediately rejects probe requests (no wasted HTTP calls to a known-dead service). After `cooldown_seconds`, it allows one probe through to test recovery.
 
 ## API
 
-| Endpoint      | Method | Description                      |
-|---------------|--------|----------------------------------|
-| `/status`     | GET    | JSON array of all probe results  |
+| Endpoint | Method | Description |
+|---|---|---|
+| `/status` | GET | JSON array of all probe results |
+
+### Response format
+
+```json
+[
+  {
+    "name": "my-app",
+    "status": "up",
+    "latency_ms": 89.4,
+    "error": null,
+    "checked_at": "2026-04-04T14:58:07Z"
+  },
+  {
+    "name": "external-api",
+    "status": "down",
+    "latency_ms": 5012.3,
+    "error": "Request timed out",
+    "checked_at": "2026-04-04T14:58:12Z"
+  }
+]
+```
 
 ## Building and running
 
 ```bash
 stack build
 stack run -- config.yaml
-```
 
-Uses [http-tower-hs](https://github.com/jarls-side-projects/http-tower-hs) as a git dependency via `stack.yaml`.
+# Or directly:
+stack exec sentinel -- config.yaml
+```
 
 ## License
 
