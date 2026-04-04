@@ -40,10 +40,10 @@ data ProbeConfig = ProbeConfig
   { probeName            :: !Text
   , probeUrl             :: !Text
   , probeInterval        :: !Int               -- seconds
-  , probeTimeout         :: !Int               -- milliseconds
-  , probeRetries         :: !Int
-  , probeFollowRedirects :: !Int               -- max hops, 0 = disabled
-  , probeExpectedStatus  :: !(Int, Int)        -- min, max (inclusive)
+  , probeTimeout         :: !(Maybe Int)       -- milliseconds, Nothing = no timeout
+  , probeRetries         :: !(Maybe Int)       -- Nothing = no retry
+  , probeFollowRedirects :: !(Maybe Int)       -- max hops, Nothing = disabled
+  , probeExpectedStatus  :: !(Maybe (Int, Int)) -- min, max (inclusive), Nothing = accept any
   , probeCircuitBreaker  :: !(Maybe CircuitBreakerSettings)
   , probeHeaders         :: ![(Text, Text)]
   } deriving (Show, Generic)
@@ -53,10 +53,10 @@ instance FromJSON ProbeConfig where
     <$> v .: "name"
     <*> v .: "url"
     <*> v .:? "interval_seconds" .!= 30
-    <*> v .:? "timeout_ms" .!= 5000
-    <*> v .:? "retries" .!= 2
-    <*> v .:? "follow_redirects" .!= 5
-    <*> v .:? "expected_status" .!= (200, 299)
+    <*> v .:? "timeout_ms"
+    <*> v .:? "retries"
+    <*> v .:? "follow_redirects"
+    <*> v .:? "expected_status"
     <*> v .:? "circuit_breaker"
     <*> v .:? "headers" .!= []
 

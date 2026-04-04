@@ -58,48 +58,41 @@ initProbeEnv configs = do
 runProbe :: ProbeEnv -> AppConfig -> ProbeConfig -> IO ProbeResult
 runProbe env appConfig config = do
   client <- newClient
-  let -- Base middleware: always applied
+  let -- Base: always applied
       base = client
         |> withUserAgent "sentinel/0.1.0"
         |> withRequestId
 
-      -- Custom headers from config
-      withCustomHeaders = foldl (\c (k, v) -> c |> withHeader (CI.mk (encodeUtf8 k)) (encodeUtf8 v))
+      -- Custom headers (only if configured)
+      c1 = foldl (\c (k, v) -> c |> withHeader (CI.mk (encodeUtf8 k)) (encodeUtf8 v))
         base (probeHeaders config)
 
-      -- Follow redirects (0 = disabled)
-      withRedirects = if probeFollowRedirects config > 0
-        then withCustomHeaders |> withFollowRedirects (probeFollowRedirects config)
-        else withCustomHeaders
+      -- Follow redirects (only if configured)
+      c2 = maybe c1 (\n -> c1 |> withFollowRedirects n) (probeFollowRedirects config)
 
-      -- Retry with constant backoff
-      withRetries = withRedirects
-        |> withRetry (constantBackoff (probeRetries config) 1.0)
+      -- Retry (only if configured)
+      c3 = maybe c2 (\n -> c2 |> withRetry (constantBackoff n 1.0)) (probeRetries config)
 
-      -- Timeout
-      withTmo = withRetries
-        |> withTimeout (probeTimeout config)
+      -- Timeout (only if configured)
+      c4 = maybe c3 (\ms -> c3 |> withTimeout ms) (probeTimeout config)
 
-      -- Status validation
-      (minStatus, maxStatus) = probeExpectedStatus config
-      withValidation = withTmo
-        |> withValidateStatus (\c -> c >= minStatus && c <= maxStatus)
+      -- Status validation (only if configured)
+      c5 = maybe c4 (\(lo, hi) -> c4 |> withValidateStatus (\c -> c >= lo && c <= hi))
+        (probeExpectedStatus config)
 
-      -- Circuit breaker (if configured)
-      withCb = case (probeCircuitBreaker config, Map.lookup (probeName config) (probeEnvBreakers env)) of
+      -- Circuit breaker (only if configured)
+      c6 = case (probeCircuitBreaker config, Map.lookup (probeName config) (probeEnvBreakers env)) of
         (Just cbs, Just breaker) ->
-          withValidation |> withCircuitBreaker
+          c5 |> withCircuitBreaker
             (CircuitBreakerConfig (cbsFailureThreshold cbs) (fromIntegral (cbsCooldownSeconds cbs)))
             breaker
-        _ -> withValidation
+        _ -> c5
 
-      -- OTel tracing (if enabled globally)
-      withTrc = if configTracing appConfig
-        then withCb |> withTracing
-        else withCb
+      -- OTel tracing (only if enabled globally)
+      c7 = if configTracing appConfig then c6 |> withTracing else c6
 
       -- Logging (always last — outermost layer)
-      configured = withTrc
+      configured = c7
         |> withLogging (\msg -> putStrLn $ "[probe:" <> unpack (probeName config) <> "] " <> unpack msg)
 
   req <- HTTP.parseRequest (unpack (probeUrl config))

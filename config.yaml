@@ -1,31 +1,25 @@
 port: 8080
-tracing: false
 
 probes:
+  # Minimal — only name and url required, everything else is optional
+  - name: example
+    url: "https://example.com"
+
+  # With some options
   - name: httpbin
     url: "https://httpbin.org/get"
     interval_seconds: 30
     timeout_ms: 5000
     retries: 2
-    follow_redirects: 5
     expected_status: [200, 299]
     circuit_breaker:
       failure_threshold: 5
       cooldown_seconds: 60
 
-  - name: example
-    url: "https://example.com"
-    interval_seconds: 60
-    timeout_ms: 3000
-    retries: 1
-    expected_status: [200, 299]
-
+  # Redirect following + custom headers
   - name: httpbin-redirect
     url: "https://httpbin.org/redirect/2"
     interval_seconds: 120
-    timeout_ms: 10000
-    retries: 1
     follow_redirects: 5
-    expected_status: [200, 200]
     headers:
       - ["X-Custom-Header", "sentinel-probe"]
