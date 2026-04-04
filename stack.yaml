@@ -1,4 +1,6 @@
 snapshot: lts-23.18
 packages:
   - .
-  - ../http-tower-hs
+extra-deps:
+  - git: https://github.com/jarls-side-projects/http-tower-hs.git
+    commit: 17af2c92a9fb4f7f3d539397ba6100712f26c3c7
