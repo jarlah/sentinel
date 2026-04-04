@@ -4,3 +4,6 @@ packages:
 extra-deps:
   - git: https://github.com/jarls-side-projects/http-tower-hs.git
     commit: 5cd935590ffa9bde18de8e745b44222247e7889b
+  - hs-opentelemetry-api-0.3.1.0
+  - thread-utils-context-0.3.0.4
+  - thread-utils-finalizers-0.1.1.0
