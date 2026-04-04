@@ -1,0 +1,50 @@
+name: sentinel
+version: 0.1.0.0
+synopsis: Programmable infrastructure event platform
+description: |
+  Sentinel monitors your services via HTTP health probes, using http-tower-hs
+  for composable middleware stacks (retry, timeout, logging). Exposes probe
+  status via a Servant JSON API.
+license: MIT
+author: Jarl André Hübenthal
+maintainer: jarlah@users.noreply.github.com
+category: Network
+github: jarls-side-projects/sentinel
+
+dependencies:
+  - base >= 4.14 && < 5
+
+executables:
+  sentinel:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - sentinel
+      - async
+      - stm
+      - containers
+      - warp
+
+library:
+  source-dirs: src
+  dependencies:
+    - http-tower-hs
+    - http-client
+    - http-client-tls
+    - aeson
+    - yaml
+    - text
+    - bytestring
+    - time
+    - stm
+    - async
+    - servant
+    - servant-server
+    - warp
+    - http-types
+    - containers
+    - wai

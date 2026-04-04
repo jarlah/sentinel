@@ -1,0 +1,4 @@
+snapshot: lts-23.18
+packages:
+  - .
+  - ../http-tower-hs
