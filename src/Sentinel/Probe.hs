@@ -40,7 +40,7 @@ import Network.HTTP.Tower
 import Sentinel.Types
 
 -- | Per-probe runtime state (circuit breakers, etc.)
-data ProbeEnv = ProbeEnv
+newtype ProbeEnv = ProbeEnv
   { probeEnvBreakers :: Map Text CircuitBreaker
   }
 

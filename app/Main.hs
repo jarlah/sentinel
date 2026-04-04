@@ -1,5 +1,3 @@
-{-# LANGUAGE NumericUnderscores #-}
-
 module Main where
 
 import Control.Concurrent.Async (mapConcurrently_)
