@@ -3,4 +3,4 @@ packages:
   - .
 extra-deps:
   - git: https://github.com/jarls-side-projects/http-tower-hs.git
-    commit: d6ec05008c96cdf5e1bedcad3da2afeb8cfa9a0d
+    commit: 5cd935590ffa9bde18de8e745b44222247e7889b
