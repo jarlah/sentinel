@@ -4,7 +4,7 @@ port: 8080
 # alerting:
 #   slack:
 #     webhook_url: "https://hooks.slack.com/services/T.../B.../xxx"
-#   email:
+#   resend:
 #     api_key: "re_xxx"
 #     from: "sentinel@example.com"
 #     to: ["oncall@example.com"]

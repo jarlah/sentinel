@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Sentinel.Alert.EmailSpec (spec) where
+module Sentinel.Alert.ResendSpec (spec) where
 
 import Data.Aeson (decode, Value(..))
 import qualified Data.Aeson.KeyMap as KM
@@ -14,16 +14,16 @@ import Test.Hspec
 
 import Network.HTTP.Tower (HttpResponse, newClient, (|>), withMock)
 
-import Sentinel.Alert.Email (notifyWith, buildRequestBody)
+import Sentinel.Alert.Resend (notifyWith, buildRequestBody)
 import Sentinel.Types
 
 spec :: Spec
-spec = describe "Email alerting" $ do
-  let cfg = EmailConfig
-        { emailApiUrl = "https://api.resend.com/emails"
-        , emailApiKey = "re_test"
-        , emailFrom = "sentinel@example.com"
-        , emailTo = ["oncall@example.com"]
+spec = describe "Resend alerting" $ do
+  let cfg = ResendConfig
+        { resendApiUrl = "https://api.resend.com/emails"
+        , resendApiKey = "re_test"
+        , resendFrom = "sentinel@example.com"
+        , resendTo = ["oncall@example.com"]
         }
 
   describe "buildRequestBody" $ do
