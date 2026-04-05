@@ -1,22 +1,33 @@
 port: 8080
 
+# Uncomment to enable alerting channels:
+# alerting:
+#   slack:
+#     webhook_url: "https://hooks.slack.com/services/T.../B.../xxx"
+#   email:
+#     api_key: "re_xxx"
+#     from: "sentinel@example.com"
+#     to: ["oncall@example.com"]
+#   prometheus:
+#     pushgateway_url: "http://localhost:9091"
+#     job: "sentinel"
+
 probes:
-  # Minimal — only name and url required, everything else is optional
   - name: example
     url: "https://example.com"
 
-  # With some options
   - name: httpbin
     url: "https://httpbin.org/get"
     interval_seconds: 30
     timeout_ms: 5000
     retries: 2
     expected_status: [200, 299]
+    alert_after: 3
+    alert_reminder: 3600
     circuit_breaker:
       failure_threshold: 5
       cooldown_seconds: 60
 
-  # Redirect following + custom headers
   - name: httpbin-redirect
     url: "https://httpbin.org/redirect/2"
     interval_seconds: 120

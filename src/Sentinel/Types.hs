@@ -7,6 +7,13 @@ module Sentinel.Types
   , ProbeStatus(..)
   , AppConfig(..)
   , CircuitBreakerSettings(..)
+  , AlertingConfig(..)
+  , SlackConfig(..)
+  , EmailConfig(..)
+  , PrometheusConfig(..)
+  , AlertEvent(..)
+  , ProbeState(..)
+  , defaultProbeState
   ) where
 
 import Data.Aeson (ToJSON(..), FromJSON(..), (.=), (.:), (.:?), (.!=), object, withObject)
@@ -14,10 +21,13 @@ import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
 import GHC.Generics (Generic)
 
+-- App config
+
 data AppConfig = AppConfig
-  { configPort    :: !Int
-  , configProbes  :: ![ProbeConfig]
-  , configTracing :: !Bool
+  { configPort     :: !Int
+  , configProbes   :: ![ProbeConfig]
+  , configTracing  :: !Bool
+  , configAlerting :: !(Maybe AlertingConfig)
   } deriving (Show, Generic)
 
 instance FromJSON AppConfig where
@@ -25,6 +35,55 @@ instance FromJSON AppConfig where
     <$> v .:? "port" .!= 8080
     <*> v .: "probes"
     <*> v .:? "tracing" .!= False
+    <*> v .:? "alerting"
+
+-- Alerting config
+
+data AlertingConfig = AlertingConfig
+  { alertSlack      :: !(Maybe SlackConfig)
+  , alertEmail      :: !(Maybe EmailConfig)
+  , alertPrometheus :: !(Maybe PrometheusConfig)
+  } deriving (Show, Generic)
+
+instance FromJSON AlertingConfig where
+  parseJSON = withObject "AlertingConfig" $ \v -> AlertingConfig
+    <$> v .:? "slack"
+    <*> v .:? "email"
+    <*> v .:? "prometheus"
+
+newtype SlackConfig = SlackConfig
+  { slackWebhookUrl :: Text
+  } deriving (Show, Generic)
+
+instance FromJSON SlackConfig where
+  parseJSON = withObject "SlackConfig" $ \v -> SlackConfig
+    <$> v .: "webhook_url"
+
+data EmailConfig = EmailConfig
+  { emailApiUrl :: !Text
+  , emailApiKey :: !Text
+  , emailFrom   :: !Text
+  , emailTo     :: ![Text]
+  } deriving (Show, Generic)
+
+instance FromJSON EmailConfig where
+  parseJSON = withObject "EmailConfig" $ \v -> EmailConfig
+    <$> v .:? "api_url" .!= "https://api.resend.com/emails"
+    <*> v .: "api_key"
+    <*> v .: "from"
+    <*> v .: "to"
+
+data PrometheusConfig = PrometheusConfig
+  { promPushgatewayUrl :: !Text
+  , promJob            :: !Text
+  } deriving (Show, Generic)
+
+instance FromJSON PrometheusConfig where
+  parseJSON = withObject "PrometheusConfig" $ \v -> PrometheusConfig
+    <$> v .: "pushgateway_url"
+    <*> v .:? "job" .!= "sentinel"
+
+-- Circuit breaker
 
 data CircuitBreakerSettings = CircuitBreakerSettings
   { cbsFailureThreshold :: !Int
@@ -36,16 +95,21 @@ instance FromJSON CircuitBreakerSettings where
     <$> v .:? "failure_threshold" .!= 5
     <*> v .:? "cooldown_seconds" .!= 30
 
+-- Probe config
+
 data ProbeConfig = ProbeConfig
   { probeName            :: !Text
   , probeUrl             :: !Text
-  , probeInterval        :: !Int               -- seconds
-  , probeTimeout         :: !(Maybe Int)       -- milliseconds, Nothing = no timeout
-  , probeRetries         :: !(Maybe Int)       -- Nothing = no retry
-  , probeFollowRedirects :: !(Maybe Int)       -- max hops, Nothing = disabled
-  , probeExpectedStatus  :: !(Maybe (Int, Int)) -- min, max (inclusive), Nothing = accept any
+  , probeInterval        :: !Int
+  , probeTimeout         :: !(Maybe Int)
+  , probeRetries         :: !(Maybe Int)
+  , probeFollowRedirects :: !(Maybe Int)
+  , probeExpectedStatus  :: !(Maybe (Int, Int))
   , probeCircuitBreaker  :: !(Maybe CircuitBreakerSettings)
   , probeHeaders         :: ![(Text, Text)]
+  , probeAlertAfter      :: !Int
+  , probeAlertReminder   :: !Int    -- seconds, 0 = no reminders
+  , probeAlerts          :: !(Maybe [Text])  -- channel names, Nothing = all configured
   } deriving (Show, Generic)
 
 instance FromJSON ProbeConfig where
@@ -59,6 +123,11 @@ instance FromJSON ProbeConfig where
     <*> v .:? "expected_status"
     <*> v .:? "circuit_breaker"
     <*> v .:? "headers" .!= []
+    <*> v .:? "alert_after" .!= 1
+    <*> v .:? "alert_reminder" .!= 0
+    <*> v .:? "alerts"
+
+-- Probe result
 
 data ProbeStatus = Up | Down
   deriving (Show, Eq, Generic)
@@ -83,3 +152,28 @@ instance ToJSON ProbeResult where
     , "error"      .= resultError r
     , "checked_at" .= resultCheckedAt r
     ]
+
+-- Alert events
+
+data AlertEvent
+  = ServiceDown !Text !(Maybe Text) !UTCTime        -- probe name, error, time
+  | ServiceStillDown !Text !(Maybe Text) !UTCTime    -- reminder
+  | ServiceRecovered !Text !Double !UTCTime           -- probe name, latency, time
+  deriving (Show, Eq)
+
+-- Probe state tracking for alert logic
+
+data ProbeState = ProbeState
+  { psLastStatus       :: !ProbeStatus
+  , psConsecutiveFails :: !Int
+  , psAlerted          :: !Bool
+  , psLastAlertAt      :: !(Maybe UTCTime)
+  } deriving (Show, Eq)
+
+defaultProbeState :: ProbeState
+defaultProbeState = ProbeState
+  { psLastStatus       = Up
+  , psConsecutiveFails = 0
+  , psAlerted          = False
+  , psLastAlertAt      = Nothing
+  }

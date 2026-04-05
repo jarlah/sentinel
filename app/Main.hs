@@ -2,6 +2,7 @@ module Main where
 
 import Control.Concurrent.Async (mapConcurrently_)
 import Control.Concurrent.STM (newTVarIO)
+import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
 import qualified Network.Wai.Handler.Warp as Warp
 import System.Environment (getArgs)
@@ -9,7 +10,7 @@ import System.Environment (getArgs)
 import Sentinel.Api (app)
 import Sentinel.Config (loadConfig)
 import Sentinel.Probe (startProbeLoop, initProbeEnv)
-import Sentinel.Types (AppConfig(..), ProbeConfig(..))
+import Sentinel.Types (AppConfig(..))
 
 main :: IO ()
 main = do
@@ -22,6 +23,7 @@ main = do
   putStrLn $ "Sentinel starting on port " <> show (configPort config)
   putStrLn $ "Monitoring " <> show (length (configProbes config)) <> " probes"
   putStrLn $ "Tracing: " <> if configTracing config then "enabled" else "disabled"
+  putStrLn $ "Alerting: " <> if isJust (configAlerting config) then "enabled" else "disabled"
 
   env <- initProbeEnv (configProbes config)
   stateVar <- newTVarIO Map.empty
