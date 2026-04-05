@@ -5,6 +5,13 @@
 
 packages:
 - completed:
+    hackage: http-tower-hs-0.1.0.0@sha256:f98246403e2cfa4905e42b1176c74d6359045089ca4deb78a17366fbf2ccff96,4188
+    pantry-tree:
+      sha256: f8b2b83b0c79e250bb8a081b5d4fc1614ac44d7ce73f0cf9d31dc416a6399837
+      size: 3032
+  original:
+    hackage: http-tower-hs-0.1.0.0
+- completed:
     hackage: hs-opentelemetry-api-0.3.1.0@sha256:54ab25b0764464733be287ced1b6aab70c12d99c7ec933b7415a59914d531dc5,4199
     pantry-tree:
       sha256: a4ec6af0393c57f6c45848ea949cc4a185051bac037df6fd6258df547965c4ba
