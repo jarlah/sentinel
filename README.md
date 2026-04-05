@@ -2,7 +2,7 @@
 
 Programmable infrastructure health monitoring as a single Haskell binary. Probes your services on a schedule, tracks status, and exposes results as a JSON API.
 
-Built on [http-tower-hs](https://github.com/jarls-side-projects/http-tower-hs) — every outbound HTTP request flows through a composable middleware stack.
+Built on [http-tower-hs](https://github.com/jarlah/http-tower-hs) — every outbound HTTP request flows through a composable middleware stack.
 
 ## Quick start
 
@@ -167,7 +167,7 @@ Use Alertmanager rules on these metrics for more advanced alerting workflows.
 
 ## Middleware stack
 
-Each probe builds its own [http-tower-hs](https://github.com/jarls-side-projects/http-tower-hs) middleware stack from config. Only configured middleware is applied:
+Each probe builds its own [http-tower-hs](https://github.com/jarlah/http-tower-hs) middleware stack from config. Only configured middleware is applied:
 
 ```
 User-Agent ─> Request ID ─> Headers ─> Redirects ─> Retry ─> Timeout ─> Validate ─> Circuit Breaker ─> Tracing ─> Logging

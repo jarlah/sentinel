@@ -9,7 +9,7 @@ license: MIT
 author: Jarl André Hübenthal
 maintainer: jarlah@users.noreply.github.com
 category: Network
-github: jarls-side-projects/sentinel
+github: jarlah/sentinel
 
 dependencies:
   - base >= 4.14 && < 5

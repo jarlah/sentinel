@@ -2,8 +2,8 @@ snapshot: lts-23.18
 packages:
   - .
 extra-deps:
-  - git: https://github.com/jarls-side-projects/http-tower-hs.git
-    commit: 5cd935590ffa9bde18de8e745b44222247e7889b
+  - git: https://github.com/jarlah/http-tower-hs.git
+    commit: 5ec00a240733b49c1f8baf48d3e4f48c04e0874b
   - hs-opentelemetry-api-0.3.1.0
   - thread-utils-context-0.3.0.4
   - thread-utils-finalizers-0.1.1.0
