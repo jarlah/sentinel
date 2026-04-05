@@ -25,6 +25,13 @@ packages:
       size: 400
   original:
     hackage: thread-utils-finalizers-0.1.1.0
+- completed:
+    hackage: testcontainers-0.5.2.0@sha256:08c1cd6276c031d8133ae08042462fdb7b6b47137c4f53a0ee7ff45ded7c6486,2536
+    pantry-tree:
+      sha256: 4a46bf5a20c8d354586f4b790f5b222e7354706f95e22b1e0e81e7581e9cfa29
+      size: 1396
+  original:
+    hackage: testcontainers-0.5.2.0
 snapshots:
 - completed:
     sha256: d133abe75e408a407cce3f032c96ac1bbadf474a93b5156ebf4135b53382d56b

@@ -3,8 +3,8 @@ version: 0.1.0.0
 synopsis: Programmable infrastructure event platform
 description: |
   Sentinel monitors your services via HTTP health probes, using http-tower-hs
-  for composable middleware stacks (retry, timeout, logging). Exposes probe
-  status via a Servant JSON API.
+  for composable middleware stacks. Alerting via Slack, email (Resend), and
+  Prometheus Pushgateway. Exposes probe status via a Servant JSON API.
 license: MIT
 author: Jarl André Hübenthal
 maintainer: jarlah@users.noreply.github.com
@@ -49,3 +49,30 @@ library:
     - containers
     - wai
     - case-insensitive
+
+tests:
+  sentinel-test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - sentinel
+      - hspec
+      - hspec-discover
+      - http-tower-hs
+      - http-client
+      - http-client-tls
+      - http-types
+      - aeson
+      - text
+      - bytestring
+      - time
+      - stm
+      - containers
+      - testcontainers
+      - process
+    build-tools:
+      - hspec-discover
