@@ -1,0 +1,150 @@
+name: Build and Deploy to Staging
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify SSH connectivity
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          SSH_PORT: ${{ vars.SSH_PORT }}
+        run: |
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          echo "Testing SSH connection to ${DEPLOY_HOST}:${SSH_PORT}..."
+          for i in 1 2 3; do
+            if ssh -p ${SSH_PORT} -i key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes sentinel@${DEPLOY_HOST} "echo ok" 2>/dev/null; then
+              echo "SSH connection verified."
+              rm -f key.pem
+              exit 0
+            fi
+            echo "Attempt $i/3 failed, retrying in 5s..."
+            sleep 5
+          done
+          rm -f key.pem
+          echo "::error::Cannot reach ${DEPLOY_HOST}:${SSH_PORT} via SSH. Aborting before build to save time."
+          exit 1
+
+      - name: Setup Haskell
+        uses: haskell-actions/setup@v2
+        with:
+          enable-stack: true
+          stack-version: 'latest'
+
+      - name: Cache Stack dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.stack
+            .stack-work
+          key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-stack-
+
+      - name: Build
+        run: stack build --copy-bins --local-bin-path ./dist
+
+      - name: Pre-deploy health check
+        env:
+          HEALTH_CHECK_URL: ${{ vars.HEALTH_CHECK_URL }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_CHECK_URL" 2>/dev/null || true)
+          STATUS=${STATUS:-000}
+          echo "Current status: HTTP $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "PRE_DEPLOY_HEALTHY=true" >> $GITHUB_ENV
+          else
+            echo "PRE_DEPLOY_HEALTHY=false" >> $GITHUB_ENV
+            echo "Warning: environment is not healthy before deploy"
+          fi
+
+      - name: Deploy
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          SSH_PORT: ${{ vars.SSH_PORT }}
+          HEALTH_CHECK_URL: ${{ vars.HEALTH_CHECK_URL }}
+        run: |
+          DEPLOY_USER=sentinel
+          DEPLOY_PATH=/home/sentinel/app
+          BACKUP_PATH=/home/sentinel/app-working-state
+
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          SSH_CMD="ssh -p ${SSH_PORT} -i key.pem -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=15"
+
+          # Helper: retry a command up to 3 times with backoff
+          retry() {
+            local max_attempts=3
+            local delay=10
+            local attempt=1
+            while [ $attempt -le $max_attempts ]; do
+              echo "  Attempt $attempt/$max_attempts..."
+              if "$@"; then
+                return 0
+              fi
+              if [ $attempt -lt $max_attempts ]; then
+                echo "  Failed, retrying in ${delay}s..."
+                sleep $delay
+                delay=$((delay * 2))
+              fi
+              attempt=$((attempt + 1))
+            done
+            echo "  All $max_attempts attempts failed."
+            return 1
+          }
+
+          # Backup current working deployment
+          if [ "$PRE_DEPLOY_HEALTHY" = "true" ]; then
+            echo "==> Backing up current deployment..."
+            retry $SSH_CMD ${DEPLOY_USER}@${DEPLOY_HOST} \
+              "rsync -a --delete ${DEPLOY_PATH}/ ${BACKUP_PATH}/ && echo 'Backup saved'"
+          fi
+
+          # Deploy binary (exclude config.yaml - managed by ansible)
+          echo "==> Deploying..."
+          retry rsync -avz -e "$SSH_CMD" \
+            dist/sentinel \
+            ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/sentinel
+
+          # Restart service
+          echo "==> Restarting sentinel..."
+          retry $SSH_CMD ${DEPLOY_USER}@${DEPLOY_HOST} "sudo systemctl restart sentinel"
+          sleep 5
+
+          # Post-deploy health check with retries
+          echo "==> Post-deploy health check..."
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_CHECK_URL" 2>/dev/null || true)
+            STATUS=${STATUS:-000}
+            if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+              echo "Health check passed (HTTP $STATUS)"
+              rm -f key.pem
+              exit 0
+            fi
+            echo "Attempt $i/5 failed (HTTP $STATUS), retrying in 3s..."
+            sleep 3
+          done
+
+          # Health check failed — rollback
+          echo "==> Health check failed! Rolling back..."
+          retry $SSH_CMD ${DEPLOY_USER}@${DEPLOY_HOST} \
+            "if [ -d ${BACKUP_PATH} ]; then
+               rsync -a --delete ${BACKUP_PATH}/ ${DEPLOY_PATH}/
+               sudo systemctl restart sentinel
+               echo 'Rollback complete'
+             else
+               echo 'No backup available for rollback'
+             fi"
+          rm -f key.pem
+          exit 1

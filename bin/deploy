@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEPLOY_USER="sentinel"
+DEPLOY_HOST="187.77.68.93"
+DEPLOY_PATH="/home/sentinel/app"
+BACKUP_PATH="/home/sentinel/app-working-state"
+SSH_PORT="22"
+MAX_WAIT=30
+POLL_INTERVAL=2
+HEALTH_CHECK_RETRIES=5
+HEALTH_CHECK_DELAY=3
+HEALTH_CHECK_URL="http://${DEPLOY_HOST}:8080/status"
+
+health_check() {
+  local attempt=1
+
+  while [ "$attempt" -le "$HEALTH_CHECK_RETRIES" ]; do
+    status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_CHECK_URL" 2>/dev/null || true)
+    status=${status:-000}
+    if [ "$status" -ge 200 ] && [ "$status" -lt 400 ]; then
+      echo "==> Health check passed (HTTP $status)"
+      return 0
+    fi
+    echo "==> Health check attempt $attempt/$HEALTH_CHECK_RETRIES failed (HTTP $status), retrying in ${HEALTH_CHECK_DELAY}s..."
+    sleep "$HEALTH_CHECK_DELAY"
+    attempt=$((attempt + 1))
+  done
+
+  echo "Error: Health check failed after $HEALTH_CHECK_RETRIES attempts (HTTP $status)"
+  return 1
+}
+
+wait_for_service() {
+  local service="sentinel"
+  local elapsed=0
+
+  echo "==> Restarting $service..."
+  ssh -p "$SSH_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+    "sudo systemctl restart $service"
+
+  echo "==> Waiting for $service to become active (max ${MAX_WAIT}s)..."
+  while [ "$elapsed" -lt "$MAX_WAIT" ]; do
+    svc_status=$(ssh -p "$SSH_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+      "systemctl is-active $service 2>/dev/null" || true)
+    if [ "$svc_status" = "active" ]; then
+      echo "==> $service is active after ${elapsed}s"
+      return 0
+    fi
+    sleep "$POLL_INTERVAL"
+    elapsed=$((elapsed + POLL_INTERVAL))
+  done
+
+  echo "Error: $service did not become active within ${MAX_WAIT}s (status: $svc_status)"
+  return 1
+}
+
+rollback() {
+  echo "==> ROLLING BACK to last known working state..."
+  ssh -p "$SSH_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+    "if [ -d ${BACKUP_PATH} ]; then
+       rsync -a --delete ${BACKUP_PATH}/ ${DEPLOY_PATH}/
+       echo 'Rollback files restored'
+     else
+       echo 'Error: No backup found at ${BACKUP_PATH}'
+       exit 1
+     fi"
+
+  wait_for_service || true
+  echo "==> Rollback complete"
+}
+
+# Verify SSH connectivity
+echo "==> Verifying SSH connectivity to staging ($DEPLOY_HOST)..."
+ssh -p "$SSH_PORT" -o ConnectTimeout=5 "${DEPLOY_USER}@${DEPLOY_HOST}" "echo 'SSH connection OK'" || {
+  echo "Error: Cannot connect to ${DEPLOY_HOST}. Check your 1Password SSH agent is running."
+  exit 1
+}
+
+# Pre-deploy health check
+echo "==> Pre-deploy health check..."
+PRE_DEPLOY_HEALTHY=false
+if health_check; then
+  PRE_DEPLOY_HEALTHY=true
+else
+  echo "Warning: staging is not healthy before deploy. Proceeding anyway (no backup will be taken)."
+fi
+
+echo "==> Cleaning previous build artifacts..."
+rm -rf .stack-work/install
+
+echo "==> Building sentinel in Docker..."
+DOCKER_IMAGE="haskell:9.8.4"
+CONTAINER_ID=$(docker create --platform linux/amd64 "$DOCKER_IMAGE" sleep infinity)
+trap "docker rm -f $CONTAINER_ID > /dev/null 2>&1" EXIT
+
+docker cp "$PWD"/. "$CONTAINER_ID":/app
+docker start "$CONTAINER_ID"
+docker exec "$CONTAINER_ID" bash -c "
+  set -e
+  cd /app
+  stack build --fast --copy-bins --local-bin-path /app/dist
+"
+
+echo "==> Copying binary from container..."
+mkdir -p dist
+docker cp "$CONTAINER_ID":/app/dist/sentinel dist/sentinel
+
+# Backup current deployment
+if [ "$PRE_DEPLOY_HEALTHY" = "true" ]; then
+  echo "==> Backing up current deployment..."
+  ssh -p "$SSH_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+    "if [ -d ${DEPLOY_PATH} ]; then
+       rsync -a --delete ${DEPLOY_PATH}/ ${BACKUP_PATH}/
+       echo 'Backup saved to ${BACKUP_PATH}'
+     fi"
+fi
+
+# Deploy binary
+echo "==> Deploying to staging ($DEPLOY_HOST)..."
+rsync -avz --exclude='config.yaml' --no-perms --no-owner --no-group \
+  -e "ssh -p ${SSH_PORT}" \
+  dist/sentinel \
+  "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/sentinel"
+
+# Restart service
+wait_for_service || {
+  echo "Error: sentinel failed to start. Rolling back..."
+  rollback
+  exit 1
+}
+
+# Post-deploy health check
+echo "==> Post-deploy health check..."
+sleep 3
+if health_check; then
+  echo "==> Deploy to staging complete and verified!"
+else
+  echo "Error: Post-deploy health check failed. Rolling back..."
+  rollback
+  exit 1
+fi
