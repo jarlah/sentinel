@@ -1,5 +1,7 @@
 # Sentinel
 
+[![CI](https://github.com/jarlah/sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/jarlah/sentinel/actions/workflows/ci.yml)
+
 Programmable infrastructure health monitoring as a single Haskell binary. Probes your services on a schedule, tracks status, and exposes results as a JSON API.
 
 Built on [http-tower-hs](https://github.com/jarlah/http-tower-hs) — every outbound HTTP request flows through a composable middleware stack.
