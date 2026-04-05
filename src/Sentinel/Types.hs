@@ -110,6 +110,9 @@ data ProbeConfig = ProbeConfig
   , probeAlertAfter      :: !Int
   , probeAlertReminder   :: !Int    -- seconds, 0 = no reminders
   , probeAlerts          :: !(Maybe [Text])  -- channel names, Nothing = all configured
+  , probeTlsCaPath       :: !(Maybe FilePath)
+  , probeTlsClientCert   :: !(Maybe FilePath)
+  , probeTlsClientKey    :: !(Maybe FilePath)
   } deriving (Show, Generic)
 
 instance FromJSON ProbeConfig where
@@ -126,6 +129,9 @@ instance FromJSON ProbeConfig where
     <*> v .:? "alert_after" .!= 1
     <*> v .:? "alert_reminder" .!= 0
     <*> v .:? "alerts"
+    <*> v .:? "tls_ca_path"
+    <*> v .:? "tls_client_cert"
+    <*> v .:? "tls_client_key"
 
 -- Probe result
 

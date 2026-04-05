@@ -103,6 +103,9 @@ minimalProbe name = ProbeConfig
   , probeAlertAfter = 1
   , probeAlertReminder = 0
   , probeAlerts = Nothing
+  , probeTlsCaPath = Nothing
+  , probeTlsClientCert = Nothing
+  , probeTlsClientKey = Nothing
   }
 
 downResult :: Text -> UTCTime -> ProbeResult

@@ -20,7 +20,7 @@ import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import qualified Network.HTTP.Client as HTTP
 
 import Network.HTTP.Tower
-  ( Client, newClient, runRequest, (|>)
+  ( Client, newClientWithTLS, runRequest, (|>)
   , withRetry, constantBackoff
   , withTimeout
   , withLogging
@@ -63,7 +63,8 @@ initProbeEnv configs = do
 -- | Build a Tower client for a probe config and execute one probe.
 runProbe :: ProbeEnv -> AppConfig -> ProbeConfig -> IO ProbeResult
 runProbe env appConfig config = do
-  client <- newClient
+  let mClientCert = (,) <$> probeTlsClientCert config <*> probeTlsClientKey config
+  client <- newClientWithTLS (probeTlsCaPath config) mClientCert
   let base = client
         |> withUserAgent "sentinel/0.1.0"
         |> withRequestId
