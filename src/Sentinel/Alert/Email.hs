@@ -2,23 +2,24 @@
 
 module Sentinel.Alert.Email
   ( notify
+  , notifyWith
   , buildRequestBody
   ) where
 
-import Data.Aeson (encode, object, (.=), ToJSON(..))
+import Data.Aeson (encode, object, (.=))
 import Data.Text (Text, pack, unpack)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.ByteString.Lazy as LBS
 import qualified Network.HTTP.Client as HTTP
 
 import Network.HTTP.Tower
-  ( newClient, runRequest, (|>)
+  ( Client, newClient, runRequest, (|>)
   , withRetry, constantBackoff, withTimeout, withUserAgent
   )
 
 import Sentinel.Types
 
--- | Send an alert email via the Resend API.
+-- | Send an alert email via the Resend API using a default client.
 notify :: EmailConfig -> AlertEvent -> IO ()
 notify cfg event = do
   client <- newClient
@@ -26,7 +27,11 @@ notify cfg event = do
         |> withRetry (constantBackoff 2 1.0)
         |> withTimeout 10000
         |> withUserAgent "sentinel/0.1.0"
+  notifyWith configured cfg event
 
+-- | Send an alert email via the Resend API using a provided client.
+notifyWith :: Client -> EmailConfig -> AlertEvent -> IO ()
+notifyWith client cfg event = do
   initReq <- HTTP.parseRequest (unpack (emailApiUrl cfg))
   let req = initReq
         { HTTP.method = "POST"
@@ -36,7 +41,7 @@ notify cfg event = do
             , ("Authorization", "Bearer " <> encodeUtf8 (emailApiKey cfg))
             ]
         }
-  _ <- runRequest configured req
+  _ <- runRequest client req
   pure ()
 
 -- | Build the Resend API JSON request body.

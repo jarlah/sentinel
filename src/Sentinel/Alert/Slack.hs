@@ -2,6 +2,7 @@
 
 module Sentinel.Alert.Slack
   ( notify
+  , notifyWith
   , buildPayload
   ) where
 
@@ -11,13 +12,13 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Network.HTTP.Client as HTTP
 
 import Network.HTTP.Tower
-  ( newClient, runRequest, (|>)
+  ( Client, newClient, runRequest, (|>)
   , withRetry, constantBackoff, withTimeout, withUserAgent
   )
 
 import Sentinel.Types
 
--- | Post an alert to a Slack webhook.
+-- | Post an alert to a Slack webhook using a default client.
 notify :: SlackConfig -> AlertEvent -> IO ()
 notify cfg event = do
   client <- newClient
@@ -25,14 +26,18 @@ notify cfg event = do
         |> withRetry (constantBackoff 2 1.0)
         |> withTimeout 5000
         |> withUserAgent "sentinel/0.1.0"
+  notifyWith configured cfg event
 
+-- | Post an alert to a Slack webhook using a provided client.
+notifyWith :: Client -> SlackConfig -> AlertEvent -> IO ()
+notifyWith client cfg event = do
   initReq <- HTTP.parseRequest (unpack (slackWebhookUrl cfg))
   let req = initReq
         { HTTP.method = "POST"
         , HTTP.requestBody = HTTP.RequestBodyLBS (buildPayload event)
         , HTTP.requestHeaders = [("Content-Type", "application/json")]
         }
-  _ <- runRequest configured req
+  _ <- runRequest client req
   pure ()
 
 -- | Build the Slack webhook JSON payload.

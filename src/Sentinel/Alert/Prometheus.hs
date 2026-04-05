@@ -3,16 +3,16 @@
 module Sentinel.Alert.Prometheus
   ( push
   , pushMetrics
+  , pushMetricsWith
   , formatMetrics
   ) where
 
 import Data.Text (Text, pack, unpack)
 import Data.Text.Encoding (encodeUtf8)
-import qualified Data.ByteString.Char8 as BS
 import qualified Network.HTTP.Client as HTTP
 
 import Network.HTTP.Tower
-  ( newClient, runRequest, (|>)
+  ( Client, newClient, runRequest, (|>)
   , withRetry, constantBackoff, withTimeout, withUserAgent
   )
 
@@ -24,7 +24,7 @@ push cfg event = do
   let (probeName, isUp, latency) = extractMetrics event
   pushMetrics cfg probeName isUp latency
 
--- | Push metrics for a specific probe.
+-- | Push metrics using a default client.
 pushMetrics :: PrometheusConfig -> Text -> Bool -> Double -> IO ()
 pushMetrics cfg probeName isUp latency = do
   client <- newClient
@@ -32,7 +32,11 @@ pushMetrics cfg probeName isUp latency = do
         |> withRetry (constantBackoff 2 1.0)
         |> withTimeout 5000
         |> withUserAgent "sentinel/0.1.0"
+  pushMetricsWith configured cfg probeName isUp latency
 
+-- | Push metrics using a provided client.
+pushMetricsWith :: Client -> PrometheusConfig -> Text -> Bool -> Double -> IO ()
+pushMetricsWith client cfg probeName isUp latency = do
   let url = unpack (promPushgatewayUrl cfg)
           <> "/metrics/job/" <> unpack (promJob cfg)
           <> "/probe/" <> unpack probeName
@@ -43,7 +47,7 @@ pushMetrics cfg probeName isUp latency = do
         , HTTP.requestBody = HTTP.RequestBodyBS (encodeUtf8 body)
         , HTTP.requestHeaders = [("Content-Type", "text/plain")]
         }
-  _ <- runRequest configured req
+  _ <- runRequest client req
   pure ()
 
 -- | Format metrics in Prometheus text exposition format.
