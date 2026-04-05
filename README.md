@@ -59,7 +59,7 @@ tracing: true
 alerting:
   slack:
     webhook_url: "https://hooks.slack.com/services/T.../B.../xxx"
-  email:
+  resend:
     api_key: "re_xxx"
     from: "sentinel@example.com"
     to: ["oncall@example.com"]
@@ -76,7 +76,7 @@ probes:
     expected_status: [200, 299]
     alert_after: 3
     alert_reminder: 3600
-    alerts: [slack, email]
+    alerts: [slack, resend]
     circuit_breaker:
       failure_threshold: 5
       cooldown_seconds: 60
@@ -112,7 +112,7 @@ probes:
 | `headers` | [[name, value]] | *none* | Custom headers added to every request |
 | `alert_after` | int | 1 | Consecutive failures before alerting |
 | `alert_reminder` | int | 0 | Seconds between reminder alerts while still down (0 = no reminders) |
-| `alerts` | [string] | *all* | Which channels to use: `slack`, `email`, `prometheus` |
+| `alerts` | [string] | *all* | Which channels to use: `slack`, `resend`, `prometheus` |
 | `tracing` | bool | false | Global: enable OpenTelemetry tracing |
 
 ### Alerting channels
@@ -121,7 +121,7 @@ probes:
 alerting:
   slack:
     webhook_url: "https://hooks.slack.com/services/T.../B.../xxx"
-  email:
+  resend:
     api_key: "re_xxx"                     # Resend API key
     from: "sentinel@example.com"
     to: ["oncall@example.com"]
@@ -133,9 +133,9 @@ alerting:
 | Field | Description |
 |---|---|
 | `alerting.slack.webhook_url` | Slack incoming webhook URL |
-| `alerting.email.api_key` | Resend API key |
-| `alerting.email.from` | Sender email address |
-| `alerting.email.to` | List of recipient email addresses |
+| `alerting.resend.api_key` | Resend API key |
+| `alerting.resend.from` | Sender email address |
+| `alerting.resend.to` | List of recipient email addresses |
 | `alerting.prometheus.pushgateway_url` | Prometheus Pushgateway URL |
 | `alerting.prometheus.job` | Job label for pushed metrics (default: `sentinel`) |
 

@@ -9,7 +9,7 @@ module Sentinel.Types
   , CircuitBreakerSettings(..)
   , AlertingConfig(..)
   , SlackConfig(..)
-  , EmailConfig(..)
+  , ResendConfig(..)
   , PrometheusConfig(..)
   , AlertEvent(..)
   , ProbeState(..)
@@ -41,14 +41,14 @@ instance FromJSON AppConfig where
 
 data AlertingConfig = AlertingConfig
   { alertSlack      :: !(Maybe SlackConfig)
-  , alertEmail      :: !(Maybe EmailConfig)
+  , alertResend      :: !(Maybe ResendConfig)
   , alertPrometheus :: !(Maybe PrometheusConfig)
   } deriving (Show, Generic)
 
 instance FromJSON AlertingConfig where
   parseJSON = withObject "AlertingConfig" $ \v -> AlertingConfig
     <$> v .:? "slack"
-    <*> v .:? "email"
+    <*> v .:? "resend"
     <*> v .:? "prometheus"
 
 newtype SlackConfig = SlackConfig
@@ -59,15 +59,15 @@ instance FromJSON SlackConfig where
   parseJSON = withObject "SlackConfig" $ \v -> SlackConfig
     <$> v .: "webhook_url"
 
-data EmailConfig = EmailConfig
-  { emailApiUrl :: !Text
-  , emailApiKey :: !Text
-  , emailFrom   :: !Text
-  , emailTo     :: ![Text]
+data ResendConfig = ResendConfig
+  { resendApiUrl :: !Text
+  , resendApiKey :: !Text
+  , resendFrom   :: !Text
+  , resendTo     :: ![Text]
   } deriving (Show, Generic)
 
-instance FromJSON EmailConfig where
-  parseJSON = withObject "EmailConfig" $ \v -> EmailConfig
+instance FromJSON ResendConfig where
+  parseJSON = withObject "ResendConfig" $ \v -> ResendConfig
     <$> v .:? "api_url" .!= "https://api.resend.com/emails"
     <*> v .: "api_key"
     <*> v .: "from"

@@ -12,7 +12,7 @@ import Data.Time.Clock (UTCTime, NominalDiffTime, diffUTCTime)
 
 import Sentinel.Types
 import qualified Sentinel.Alert.Slack as Slack
-import qualified Sentinel.Alert.Email as Email
+import qualified Sentinel.Alert.Resend as Resend
 import qualified Sentinel.Alert.Prometheus as Prom
 
 -- | Check probe result against previous state, return updated state and
@@ -87,8 +87,8 @@ dispatch alertCfg probeCfg event = do
     Just cfg | enabled "slack" -> Slack.notify cfg event
     _ -> pure ()
 
-  case alertEmail alertCfg of
-    Just cfg | enabled "email" -> Email.notify cfg event
+  case alertResend alertCfg of
+    Just cfg | enabled "resend" -> Resend.notify cfg event
     _ -> pure ()
 
   -- Prometheus always pushes (metrics, not alerts per se)

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Sentinel.Alert.Email
+module Sentinel.Alert.Resend
   ( notify
   , notifyWith
   , buildRequestBody
@@ -19,8 +19,8 @@ import Network.HTTP.Tower
 
 import Sentinel.Types
 
--- | Send an alert email via the Resend API using a default client.
-notify :: EmailConfig -> AlertEvent -> IO ()
+-- | Send an alert via the Resend API using a default client.
+notify :: ResendConfig -> AlertEvent -> IO ()
 notify cfg event = do
   client <- newClient
   let configured = client
@@ -29,26 +29,26 @@ notify cfg event = do
         |> withUserAgent "sentinel/0.1.0"
   notifyWith configured cfg event
 
--- | Send an alert email via the Resend API using a provided client.
-notifyWith :: Client -> EmailConfig -> AlertEvent -> IO ()
+-- | Send an alert via the Resend API using a provided client.
+notifyWith :: Client -> ResendConfig -> AlertEvent -> IO ()
 notifyWith client cfg event = do
-  initReq <- HTTP.parseRequest (unpack (emailApiUrl cfg))
+  initReq <- HTTP.parseRequest (unpack (resendApiUrl cfg))
   let req = initReq
         { HTTP.method = "POST"
         , HTTP.requestBody = HTTP.RequestBodyLBS (buildRequestBody cfg event)
         , HTTP.requestHeaders =
             [ ("Content-Type", "application/json")
-            , ("Authorization", "Bearer " <> encodeUtf8 (emailApiKey cfg))
+            , ("Authorization", "Bearer " <> encodeUtf8 (resendApiKey cfg))
             ]
         }
   _ <- runRequest client req
   pure ()
 
 -- | Build the Resend API JSON request body.
-buildRequestBody :: EmailConfig -> AlertEvent -> LBS.ByteString
+buildRequestBody :: ResendConfig -> AlertEvent -> LBS.ByteString
 buildRequestBody cfg event = encode $ object
-  [ "from"    .= emailFrom cfg
-  , "to"      .= emailTo cfg
+  [ "from"    .= resendFrom cfg
+  , "to"      .= resendTo cfg
   , "subject" .= subject event
   , "html"    .= htmlBody event
   ]
