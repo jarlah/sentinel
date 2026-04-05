@@ -96,6 +96,12 @@ probes:
   - name: redirect-check
     url: "https://old.example.com"
     follow_redirects: 3
+
+  - name: internal-service
+    url: "https://internal.example.com/health"
+    tls_ca_path: "/etc/sentinel/ca.pem"
+    tls_client_cert: "/etc/sentinel/client.pem"
+    tls_client_key: "/etc/sentinel/client-key.pem"
 ```
 
 ### Config reference
@@ -115,6 +121,9 @@ probes:
 | `alert_after` | int | 1 | Consecutive failures before alerting |
 | `alert_reminder` | int | 0 | Seconds between reminder alerts while still down (0 = no reminders) |
 | `alerts` | [string] | *all* | Which channels to use: `slack`, `resend`, `prometheus` |
+| `tls_ca_path` | string | *none* | Path to a custom CA certificate (PEM) for TLS verification |
+| `tls_client_cert` | string | *none* | Path to client certificate (PEM) for mTLS |
+| `tls_client_key` | string | *none* | Path to client private key (PEM) for mTLS |
 | `tracing` | bool | false | Global: enable OpenTelemetry tracing |
 
 ### Alerting channels
@@ -178,7 +187,7 @@ User-Agent ─> Request ID ─> Headers ─> Redirects ─> Retry ─> Timeout �
 
 ```haskell
 -- What sentinel builds under the hood:
-client <- newClient
+client <- newClientWithTLS maybeCaPath maybeClientCert
 let configured = client
       |> withUserAgent "sentinel/0.1.0"
       |> withRequestId
