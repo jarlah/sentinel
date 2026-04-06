@@ -96,7 +96,7 @@ mkPingService kind = Service $ \() -> do
 applyMiddleware :: ProbeConfig -> Map Text CircuitBreaker -> Service () () -> Service () ()
 applyMiddleware config breakers base =
   let s1 = maybe base (\n -> withRetry (constantBackoff n 1.0) base) (probeRetries config)
-      s2 = maybe s1 (\ms -> withTimeout ms s1) (probeTimeout config)
+      s2 = maybe s1 (`withTimeout` s1) (probeTimeout config)
       s3 = case (probeCircuitBreaker config, Map.lookup (probeName config) breakers) of
         (Just cbs, Just breaker) ->
           withCircuitBreaker

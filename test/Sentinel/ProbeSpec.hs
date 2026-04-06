@@ -148,7 +148,7 @@ mtlsProbe port = ProbeConfig
       , httpTlsClientKey = Nothing
       }
   , probeInterval = 30
-  , probeTimeout = Just 10000
+  , probeTimeout = Just 10_000
   , probeRetries = Nothing
   , probeCircuitBreaker = Nothing
   , probeAlertAfter = 1

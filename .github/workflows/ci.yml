@@ -24,6 +24,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-stack-
 
+      - name: Install HLint
+        uses: haskell-actions/hlint-setup@v2
+
+      - name: Run HLint
+        uses: haskell-actions/hlint-run@v2
+        with:
+          path: '["src/", "app/", "test/"]'
+          fail-on: suggestion
+
       - name: Build
         run: stack build --fast
 

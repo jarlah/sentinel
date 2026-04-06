@@ -73,7 +73,7 @@ spec = describe "Database probes (Docker)" $ beforeAll dockerAvailable $ do
                 { probeName = "bad-mysql"
                 , probeKind = MySQLProbe MySQLProbeConfig
                     { mysqlHost = "localhost"
-                    , mysqlPort = 59997
+                    , mysqlPort = 59_997
                     , mysqlUser = "root"
                     , mysqlPassword = "testpass"
                     , mysqlDatabase = "testdb"
@@ -125,7 +125,7 @@ setupPostgres = do
     TC.& TC.setExpose [5432]
     TC.& TC.setEnv [("POSTGRES_PASSWORD", "testpass"), ("POSTGRES_DB", "testdb")]
     TC.& TC.setWaitingFor (TC.waitUntilTimeout 60
-      (TC.waitForLogLine TC.Stderr (\t -> LT.isInfixOf "database system is ready to accept connections" t)))
+      (TC.waitForLogLine TC.Stderr (LT.isInfixOf "database system is ready to accept connections")))
   pure (TC.containerPort container 5432)
 
 setupMySQL :: TC.TestContainer Int
