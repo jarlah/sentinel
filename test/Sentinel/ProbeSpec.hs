@@ -83,10 +83,16 @@ spec = describe "Probe mTLS (Docker)" $ beforeAll dockerAvailable $ do
         withContainers (setupNginx certDir) $ \port -> do
           threadDelay 2_000_000
 
-          let config = (mtlsProbe port)
-                { probeTlsCaPath = Just (certDir <> "/ca.pem")
-                , probeTlsClientCert = Just (certDir <> "/client.pem")
-                , probeTlsClientKey = Just (certDir <> "/client-key.pem")
+          let baseProbe = mtlsProbe port
+              httpCfg = case probeKind baseProbe of
+                HttpProbe h -> h
+                _ -> error "unexpected"
+              config = baseProbe
+                { probeKind = HttpProbe httpCfg
+                    { httpTlsCaPath = Just (certDir <> "/ca.pem")
+                    , httpTlsClientCert = Just (certDir <> "/client.pem")
+                    , httpTlsClientKey = Just (certDir <> "/client-key.pem")
+                    }
                 }
           env <- initProbeEnv [config]
           result <- runProbe env defaultAppConfig config
@@ -102,11 +108,17 @@ spec = describe "Probe mTLS (Docker)" $ beforeAll dockerAvailable $ do
         withContainers (setupNginx certDir) $ \port -> do
           threadDelay 2_000_000
 
-          let config = (mtlsProbe port)
-                { probeTlsCaPath = Just (certDir <> "/ca.pem")
-                , probeTlsClientCert = Nothing
-                , probeTlsClientKey = Nothing
-                , probeExpectedStatus = Just (200, 299)
+          let baseProbe = mtlsProbe port
+              httpCfg = case probeKind baseProbe of
+                HttpProbe h -> h
+                _ -> error "unexpected"
+              config = baseProbe
+                { probeKind = HttpProbe httpCfg
+                    { httpTlsCaPath = Just (certDir <> "/ca.pem")
+                    , httpTlsClientCert = Nothing
+                    , httpTlsClientKey = Nothing
+                    , httpExpectedStatus = Just (200, 299)
+                    }
                 }
           env <- initProbeEnv [config]
           result <- runProbe env defaultAppConfig config
@@ -126,20 +138,22 @@ setupNginx dir = do
 mtlsProbe :: Int -> ProbeConfig
 mtlsProbe port = ProbeConfig
   { probeName = "mtls-test"
-  , probeUrl = "https://localhost:" <> pack (show port) <> "/"
+  , probeKind = HttpProbe HttpProbeConfig
+      { httpUrl = "https://localhost:" <> pack (show port) <> "/"
+      , httpFollowRedirects = Nothing
+      , httpExpectedStatus = Nothing
+      , httpHeaders = []
+      , httpTlsCaPath = Nothing
+      , httpTlsClientCert = Nothing
+      , httpTlsClientKey = Nothing
+      }
   , probeInterval = 30
   , probeTimeout = Just 10000
   , probeRetries = Nothing
-  , probeFollowRedirects = Nothing
-  , probeExpectedStatus = Nothing
   , probeCircuitBreaker = Nothing
-  , probeHeaders = []
   , probeAlertAfter = 1
   , probeAlertReminder = 0
   , probeAlerts = Nothing
-  , probeTlsCaPath = Nothing
-  , probeTlsClientCert = Nothing
-  , probeTlsClientKey = Nothing
   }
 
 defaultAppConfig :: AppConfig

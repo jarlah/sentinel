@@ -34,3 +34,29 @@ probes:
     follow_redirects: 5
     headers:
       - ["X-Custom-Header", "sentinel-probe"]
+
+  # Database probes (uncomment to enable):
+  # - name: main-postgres
+  #   type: postgres
+  #   connection_string: "host=localhost port=5432 dbname=mydb user=postgres password=secret"
+  #   interval_seconds: 30
+  #   timeout_ms: 5000
+  #   retries: 2
+  #   circuit_breaker:
+  #     failure_threshold: 5
+  #     cooldown_seconds: 60
+
+  # - name: cache-redis
+  #   type: redis
+  #   connection_string: "redis://localhost:6379"
+  #   interval_seconds: 15
+  #   timeout_ms: 3000
+
+  # - name: app-mysql
+  #   type: mysql
+  #   host: "localhost"
+  #   port: 3306
+  #   user: "monitor"
+  #   password: "secret"
+  #   database: "mydb"
+  #   interval_seconds: 30

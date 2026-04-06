@@ -92,20 +92,22 @@ spec = describe "Alert state machine" $ do
 minimalProbe :: Text -> ProbeConfig
 minimalProbe name = ProbeConfig
   { probeName = name
-  , probeUrl = "http://example.com"
+  , probeKind = HttpProbe HttpProbeConfig
+      { httpUrl = "http://example.com"
+      , httpFollowRedirects = Nothing
+      , httpExpectedStatus = Nothing
+      , httpHeaders = []
+      , httpTlsCaPath = Nothing
+      , httpTlsClientCert = Nothing
+      , httpTlsClientKey = Nothing
+      }
   , probeInterval = 30
   , probeTimeout = Nothing
   , probeRetries = Nothing
-  , probeFollowRedirects = Nothing
-  , probeExpectedStatus = Nothing
   , probeCircuitBreaker = Nothing
-  , probeHeaders = []
   , probeAlertAfter = 1
   , probeAlertReminder = 0
   , probeAlerts = Nothing
-  , probeTlsCaPath = Nothing
-  , probeTlsClientCert = Nothing
-  , probeTlsClientKey = Nothing
   }
 
 downResult :: Text -> UTCTime -> ProbeResult

@@ -5,12 +5,19 @@
 
 packages:
 - completed:
-    hackage: http-tower-hs-0.1.0.0@sha256:f98246403e2cfa4905e42b1176c74d6359045089ca4deb78a17366fbf2ccff96,4188
+    hackage: http-tower-hs-0.2.0.0@sha256:7d0eb46186857722fa5eb0416664bd9e8a8b368d04dfe277c5b132b12cfc34e9,3629
     pantry-tree:
-      sha256: f8b2b83b0c79e250bb8a081b5d4fc1614ac44d7ce73f0cf9d31dc416a6399837
-      size: 3032
+      sha256: d99c5408551600482acbe569e1eb1a146384a38a173f6263486a18f09a0dc88f
+      size: 1935
   original:
-    hackage: http-tower-hs-0.1.0.0
+    hackage: http-tower-hs-0.2.0.0
+- completed:
+    hackage: tower-hs-0.1.0.0@sha256:b59a1b3854ce787cdf366382186446dd94715aaf6189e93289b34d01dba97a52,2756
+    pantry-tree:
+      sha256: 7e09e4589e6ab544784b1620c5219f818678baf3653593b0a903864a987ba117
+      size: 2067
+  original:
+    hackage: tower-hs-0.1.0.0
 - completed:
     hackage: hs-opentelemetry-api-0.3.1.0@sha256:54ab25b0764464733be287ced1b6aab70c12d99c7ec933b7415a59914d531dc5,4199
     pantry-tree:
@@ -39,6 +46,41 @@ packages:
       size: 1396
   original:
     hackage: testcontainers-0.5.2.0
+- completed:
+    hackage: mysql-haskell-1.1.4@sha256:3a3d9022168bda3bc30f86f7453c9104ee3ca67bb78c564009504cc9d7bcaed8,5137
+    pantry-tree:
+      sha256: b8881e0c71ca770f379b0a4d4679a33f21c9e7cbee5256321b0c43f7d1e6b8de
+      size: 4968
+  original:
+    hackage: mysql-haskell-1.1.4
+- completed:
+    hackage: tcp-streams-1.0.1.1@sha256:35e9ecfa515797052f8c3c01834d2daebd5e93f3152c7fc98b32652bf6f0c052,2329
+    pantry-tree:
+      sha256: 572071fca40a0b6c4cc950d10277a6f12e83cf4846882b6ef83fcccaa2c18c45
+      size: 1004
+  original:
+    hackage: tcp-streams-1.0.1.1
+- completed:
+    hackage: wire-streams-0.1.1.0@sha256:08816c7fa53b20f52e5c465252c106d9de8e6d9580ec0b6d9f000a34c7bcefc8,2130
+    pantry-tree:
+      sha256: c99a12bfcbeacc5da8f166fbed1eb105a45f08be1a3a071fe9f903b386b14e1d
+      size: 506
+  original:
+    hackage: wire-streams-0.1.1.0
+- completed:
+    hackage: crypton-0.34@sha256:9e4b50d79d1fba681befa08151db7223d2b4bb72564853e8530e614105d53a1a,14577
+    pantry-tree:
+      sha256: 85f438e6d328fc2e464c8914a08089ff312044b96ac155a25747512e440e0a12
+      size: 23275
+  original:
+    hackage: crypton-0.34@sha256:9e4b50d79d1fba681befa08151db7223d2b4bb72564853e8530e614105d53a1a,14577
+- completed:
+    hackage: tls-2.0.6@sha256:387db273062241f460b9e85e86ce085877a5958a65cc30946bcc624a9f5274e2,6358
+    pantry-tree:
+      sha256: b60b3c6f5cf72a9ea8a4311a794d1b23c1bedd4bad1e6a1ca0784d97f1a82bac
+      size: 6451
+  original:
+    hackage: tls-2.0.6@sha256:387db273062241f460b9e85e86ce085877a5958a65cc30946bcc624a9f5274e2,6358
 snapshots:
 - completed:
     sha256: d133abe75e408a407cce3f032c96ac1bbadf474a93b5156ebf4135b53382d56b

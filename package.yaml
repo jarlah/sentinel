@@ -33,6 +33,7 @@ library:
   source-dirs: src
   dependencies:
     - http-tower-hs
+    - tower-hs
     - http-client
     - http-client-tls
     - aeson
@@ -49,6 +50,9 @@ library:
     - containers
     - wai
     - case-insensitive
+    - postgresql-simple
+    - mysql-haskell
+    - hedis
 
 tests:
   sentinel-test:
@@ -63,6 +67,7 @@ tests:
       - hspec
       - hspec-discover
       - http-tower-hs
+      - tower-hs
       - http-client
       - http-client-tls
       - http-types

@@ -38,6 +38,7 @@ import Network.HTTP.Tower
   )
 
 import Sentinel.Types
+import Sentinel.Probe.Database (runDbProbe)
 import qualified Sentinel.Alert as Alert
 
 -- | Per-probe runtime state.
@@ -60,22 +61,28 @@ initProbeEnv configs = do
       breaker <- newCircuitBreaker
       pure (probeName cfg, breaker)
 
--- | Build a Tower client for a probe config and execute one probe.
+-- | Execute one probe, dispatching based on ProbeKind.
 runProbe :: ProbeEnv -> AppConfig -> ProbeConfig -> IO ProbeResult
-runProbe env appConfig config = do
-  let mClientCert = (,) <$> probeTlsClientCert config <*> probeTlsClientKey config
-  client <- newClientWithTLS (probeTlsCaPath config) mClientCert
+runProbe env appConfig config = case probeKind config of
+  HttpProbe httpCfg -> runHttpProbe env appConfig config httpCfg
+  _                 -> runDbProbe (probeEnvBreakers env) config
+
+-- | Build a Tower HTTP client for a probe config and execute one HTTP probe.
+runHttpProbe :: ProbeEnv -> AppConfig -> ProbeConfig -> HttpProbeConfig -> IO ProbeResult
+runHttpProbe env appConfig config httpCfg = do
+  let mClientCert = (,) <$> httpTlsClientCert httpCfg <*> httpTlsClientKey httpCfg
+  client <- newClientWithTLS (httpTlsCaPath httpCfg) mClientCert
   let base = client
         |> withUserAgent "sentinel/0.1.0"
         |> withRequestId
 
       c1 = foldl (\c (k, v) -> c |> withHeader (CI.mk (encodeUtf8 k)) (encodeUtf8 v))
-        base (probeHeaders config)
-      c2 = maybe c1 (\n -> c1 |> withFollowRedirects n) (probeFollowRedirects config)
+        base (httpHeaders httpCfg)
+      c2 = maybe c1 (\n -> c1 |> withFollowRedirects n) (httpFollowRedirects httpCfg)
       c3 = maybe c2 (\n -> c2 |> withRetry (constantBackoff n 1.0)) (probeRetries config)
       c4 = maybe c3 (\ms -> c3 |> withTimeout ms) (probeTimeout config)
       c5 = maybe c4 (\(lo, hi) -> c4 |> withValidateStatus (\c -> c >= lo && c <= hi))
-        (probeExpectedStatus config)
+        (httpExpectedStatus httpCfg)
       c6 = case (probeCircuitBreaker config, Map.lookup (probeName config) (probeEnvBreakers env)) of
         (Just cbs, Just breaker) ->
           c5 |> withCircuitBreaker
@@ -86,7 +93,7 @@ runProbe env appConfig config = do
       configured = c7
         |> withLogging (\msg -> putStrLn $ "[probe:" <> unpack (probeName config) <> "] " <> unpack msg)
 
-  req <- HTTP.parseRequest (unpack (probeUrl config))
+  req <- HTTP.parseRequest (unpack (httpUrl httpCfg))
   start <- getCurrentTime
   result <- runRequest configured req
   end <- getCurrentTime

@@ -2,8 +2,14 @@ snapshot: lts-23.18
 packages:
   - .
 extra-deps:
-  - http-tower-hs-0.1.0.0
+  - http-tower-hs-0.2.0.0
+  - tower-hs-0.1.0.0
   - hs-opentelemetry-api-0.3.1.0
   - thread-utils-context-0.3.0.4
   - thread-utils-finalizers-0.1.1.0
   - testcontainers-0.5.2.0
+  - mysql-haskell-1.1.4
+  - tcp-streams-1.0.1.1
+  - wire-streams-0.1.1.0
+  - crypton-0.34@sha256:9e4b50d79d1fba681befa08151db7223d2b4bb72564853e8530e614105d53a1a,14577
+  - tls-2.0.6@sha256:387db273062241f460b9e85e86ce085877a5958a65cc30946bcc624a9f5274e2,6358

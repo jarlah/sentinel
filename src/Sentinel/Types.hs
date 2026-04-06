@@ -3,6 +3,9 @@
 
 module Sentinel.Types
   ( ProbeConfig(..)
+  , ProbeKind(..)
+  , HttpProbeConfig(..)
+  , MySQLProbeConfig(..)
   , ProbeResult(..)
   , ProbeStatus(..)
   , AppConfig(..)
@@ -16,7 +19,7 @@ module Sentinel.Types
   , defaultProbeState
   ) where
 
-import Data.Aeson (ToJSON(..), FromJSON(..), (.=), (.:), (.:?), (.!=), object, withObject)
+import Data.Aeson (ToJSON(..), FromJSON(..), Value(..), (.=), (.:), (.:?), (.!=), object, withObject)
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
 import GHC.Generics (Generic)
@@ -95,43 +98,101 @@ instance FromJSON CircuitBreakerSettings where
     <$> v .:? "failure_threshold" .!= 5
     <*> v .:? "cooldown_seconds" .!= 30
 
--- Probe config
+-- Probe kind (HTTP vs database)
+
+data HttpProbeConfig = HttpProbeConfig
+  { httpUrl             :: !Text
+  , httpFollowRedirects :: !(Maybe Int)
+  , httpExpectedStatus  :: !(Maybe (Int, Int))
+  , httpHeaders         :: ![(Text, Text)]
+  , httpTlsCaPath       :: !(Maybe FilePath)
+  , httpTlsClientCert   :: !(Maybe FilePath)
+  , httpTlsClientKey    :: !(Maybe FilePath)
+  } deriving (Show, Generic)
+
+data MySQLProbeConfig = MySQLProbeConfig
+  { mysqlHost     :: !Text
+  , mysqlPort     :: !Int
+  , mysqlUser     :: !Text
+  , mysqlPassword :: !Text
+  , mysqlDatabase :: !Text
+  } deriving (Show, Generic)
+
+instance FromJSON MySQLProbeConfig where
+  parseJSON = withObject "MySQLProbeConfig" $ \v -> MySQLProbeConfig
+    <$> v .:? "host" .!= "localhost"
+    <*> v .:? "port" .!= 3306
+    <*> v .:? "user" .!= "root"
+    <*> v .:? "password" .!= ""
+    <*> v .:? "database" .!= ""
+
+data ProbeKind
+  = HttpProbe !HttpProbeConfig
+  | PostgresProbe !Text          -- connection string
+  | MySQLProbe !MySQLProbeConfig
+  | RedisProbe !Text             -- connection URI (e.g. "redis://localhost:6379")
+  deriving (Show, Generic)
+
+-- Probe config (shared fields + kind-specific)
 
 data ProbeConfig = ProbeConfig
-  { probeName            :: !Text
-  , probeUrl             :: !Text
-  , probeInterval        :: !Int
-  , probeTimeout         :: !(Maybe Int)
-  , probeRetries         :: !(Maybe Int)
-  , probeFollowRedirects :: !(Maybe Int)
-  , probeExpectedStatus  :: !(Maybe (Int, Int))
-  , probeCircuitBreaker  :: !(Maybe CircuitBreakerSettings)
-  , probeHeaders         :: ![(Text, Text)]
-  , probeAlertAfter      :: !Int
-  , probeAlertReminder   :: !Int    -- seconds, 0 = no reminders
-  , probeAlerts          :: !(Maybe [Text])  -- channel names, Nothing = all configured
-  , probeTlsCaPath       :: !(Maybe FilePath)
-  , probeTlsClientCert   :: !(Maybe FilePath)
-  , probeTlsClientKey    :: !(Maybe FilePath)
+  { probeName           :: !Text
+  , probeKind           :: !ProbeKind
+  , probeInterval       :: !Int
+  , probeTimeout        :: !(Maybe Int)
+  , probeRetries        :: !(Maybe Int)
+  , probeCircuitBreaker :: !(Maybe CircuitBreakerSettings)
+  , probeAlertAfter     :: !Int
+  , probeAlertReminder  :: !Int    -- seconds, 0 = no reminders
+  , probeAlerts         :: !(Maybe [Text])  -- channel names, Nothing = all configured
   } deriving (Show, Generic)
 
 instance FromJSON ProbeConfig where
-  parseJSON = withObject "ProbeConfig" $ \v -> ProbeConfig
-    <$> v .: "name"
-    <*> v .: "url"
-    <*> v .:? "interval_seconds" .!= 30
-    <*> v .:? "timeout_ms"
-    <*> v .:? "retries"
-    <*> v .:? "follow_redirects"
-    <*> v .:? "expected_status"
-    <*> v .:? "circuit_breaker"
-    <*> v .:? "headers" .!= []
-    <*> v .:? "alert_after" .!= 1
-    <*> v .:? "alert_reminder" .!= 0
-    <*> v .:? "alerts"
-    <*> v .:? "tls_ca_path"
-    <*> v .:? "tls_client_cert"
-    <*> v .:? "tls_client_key"
+  parseJSON = withObject "ProbeConfig" $ \v -> do
+    name         <- v .: "name"
+    interval     <- v .:? "interval_seconds" .!= 30
+    timeout      <- v .:? "timeout_ms"
+    retries      <- v .:? "retries"
+    cb           <- v .:? "circuit_breaker"
+    alertAfter   <- v .:? "alert_after" .!= 1
+    alertRemind  <- v .:? "alert_reminder" .!= 0
+    alerts       <- v .:? "alerts"
+
+    probeType <- v .:? "type" .!= ("http" :: Text)
+    kind <- case probeType of
+      "http" -> do
+        url            <- v .: "url"
+        followRedirs   <- v .:? "follow_redirects"
+        expectedStatus <- v .:? "expected_status"
+        headers        <- v .:? "headers" .!= []
+        tlsCa          <- v .:? "tls_ca_path"
+        tlsCert        <- v .:? "tls_client_cert"
+        tlsKey         <- v .:? "tls_client_key"
+        pure $ HttpProbe HttpProbeConfig
+          { httpUrl             = url
+          , httpFollowRedirects = followRedirs
+          , httpExpectedStatus  = expectedStatus
+          , httpHeaders         = headers
+          , httpTlsCaPath       = tlsCa
+          , httpTlsClientCert   = tlsCert
+          , httpTlsClientKey    = tlsKey
+          }
+      "postgres" -> PostgresProbe <$> v .: "connection_string"
+      "mysql"    -> MySQLProbe <$> parseJSON (Object v)
+      "redis"    -> RedisProbe <$> v .:? "connection_string" .!= "redis://localhost:6379"
+      other      -> fail $ "Unknown probe type: " <> show other
+
+    pure ProbeConfig
+      { probeName           = name
+      , probeKind           = kind
+      , probeInterval       = interval
+      , probeTimeout        = timeout
+      , probeRetries        = retries
+      , probeCircuitBreaker = cb
+      , probeAlertAfter     = alertAfter
+      , probeAlertReminder  = alertRemind
+      , probeAlerts         = alerts
+      }
 
 -- Probe result
 
