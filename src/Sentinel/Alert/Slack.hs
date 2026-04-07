@@ -11,8 +11,9 @@ import Data.Text (Text, pack, unpack)
 import qualified Data.ByteString.Lazy as LBS
 import qualified Network.HTTP.Client as HTTP
 
+import Data.Function ((&))
 import Network.HTTP.Tower
-  ( Client, newClient, runRequest, (|>)
+  ( Client, newClient, runRequest, applyMiddleware
   , withRetry, constantBackoff, withTimeout, withUserAgent
   )
 
@@ -22,10 +23,11 @@ import Sentinel.Types
 notify :: SlackConfig -> AlertEvent -> IO ()
 notify cfg event = do
   client <- newClient
-  let configured = client
-        |> withRetry (constantBackoff 2 1.0)
-        |> withTimeout 5000
-        |> withUserAgent "sentinel/0.1.0"
+  let configured = client & applyMiddleware
+        ( withRetry (constantBackoff 2 1.0)
+        . withTimeout 5000
+        . withUserAgent "sentinel/0.1.0"
+        )
   notifyWith configured cfg event
 
 -- | Post an alert to a Slack webhook using a provided client.

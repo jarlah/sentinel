@@ -11,7 +11,8 @@ import Data.Time.Clock (getCurrentTime)
 import qualified Network.HTTP.Client as HTTP
 import Test.Hspec
 
-import Network.HTTP.Tower (HttpResponse, newClient, (|>), withMock)
+import Data.Function ((&))
+import Network.HTTP.Tower (HttpResponse, newClient, applyMiddleware, withMock)
 
 import Sentinel.Alert.Slack (notifyWith, buildPayload)
 import Sentinel.Types
@@ -48,9 +49,9 @@ spec = describe "Slack alerting" $ do
     it "sends POST to the webhook URL" $ do
       recorder <- newIORef []
       client <- newClient
-      let mocked = client |> withMock (\req -> do
+      let mocked = client & applyMiddleware (withMock (\req -> do
             modifyIORef' recorder (req :)
-            pure (Right fakeOkResponse))
+            pure (Right fakeOkResponse)))
           cfg = SlackConfig "http://hooks.example.com/slack"
       now <- getCurrentTime
       notifyWith mocked cfg (ServiceDown "my-app" Nothing now)
@@ -62,9 +63,9 @@ spec = describe "Slack alerting" $ do
     it "sends JSON content type" $ do
       recorder <- newIORef []
       client <- newClient
-      let mocked = client |> withMock (\req -> do
+      let mocked = client & applyMiddleware (withMock (\req -> do
             modifyIORef' recorder (req :)
-            pure (Right fakeOkResponse))
+            pure (Right fakeOkResponse)))
           cfg = SlackConfig "http://hooks.example.com/slack"
       now <- getCurrentTime
       notifyWith mocked cfg (ServiceDown "test" Nothing now)

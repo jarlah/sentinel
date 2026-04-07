@@ -19,8 +19,9 @@ import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import qualified Network.HTTP.Client as HTTP
 
+import Data.Function ((&))
 import Network.HTTP.Tower
-  ( Client, newClientWithTLS, runRequest, (|>)
+  ( Client, newClientWithTLS, runRequest, applyMiddleware
   , withRetry, constantBackoff
   , withTimeout
   , withLogging
@@ -72,26 +73,27 @@ runHttpProbe :: ProbeEnv -> AppConfig -> ProbeConfig -> HttpProbeConfig -> IO Pr
 runHttpProbe env appConfig config httpCfg = do
   let mClientCert = (,) <$> httpTlsClientCert httpCfg <*> httpTlsClientKey httpCfg
   client <- newClientWithTLS (httpTlsCaPath httpCfg) mClientCert
-  let base = client
-        |> withUserAgent "sentinel/0.1.0"
-        |> withRequestId
+  let base = client & applyMiddleware
+        ( withUserAgent "sentinel/0.1.0"
+        . withRequestId
+        )
 
-      c1 = foldl (\c (k, v) -> c |> withHeader (CI.mk (encodeUtf8 k)) (encodeUtf8 v))
+      c1 = foldl (\c (k, v) -> c & applyMiddleware (withHeader (CI.mk (encodeUtf8 k)) (encodeUtf8 v)))
         base (httpHeaders httpCfg)
-      c2 = maybe c1 (\n -> c1 |> withFollowRedirects n) (httpFollowRedirects httpCfg)
-      c3 = maybe c2 (\n -> c2 |> withRetry (constantBackoff n 1.0)) (probeRetries config)
-      c4 = maybe c3 (\ms -> c3 |> withTimeout ms) (probeTimeout config)
-      c5 = maybe c4 (\(lo, hi) -> c4 |> withValidateStatus (\c -> c >= lo && c <= hi))
+      c2 = maybe c1 (\n -> c1 & applyMiddleware (withFollowRedirects n)) (httpFollowRedirects httpCfg)
+      c3 = maybe c2 (\n -> c2 & applyMiddleware (withRetry (constantBackoff n 1.0))) (probeRetries config)
+      c4 = maybe c3 (\ms -> c3 & applyMiddleware (withTimeout ms)) (probeTimeout config)
+      c5 = maybe c4 (\(lo, hi) -> c4 & applyMiddleware (withValidateStatus (\c -> c >= lo && c <= hi)))
         (httpExpectedStatus httpCfg)
       c6 = case (probeCircuitBreaker config, Map.lookup (probeName config) (probeEnvBreakers env)) of
         (Just cbs, Just breaker) ->
-          c5 |> withCircuitBreaker
+          c5 & applyMiddleware (withCircuitBreaker
             (CircuitBreakerConfig (cbsFailureThreshold cbs) (fromIntegral (cbsCooldownSeconds cbs)))
-            breaker
+            breaker)
         _ -> c5
-      c7 = if configTracing appConfig then c6 |> withTracing else c6
-      configured = c7
-        |> withLogging (\msg -> putStrLn $ "[probe:" <> unpack (probeName config) <> "] " <> unpack msg)
+      c7 = if configTracing appConfig then c6 & applyMiddleware withTracing else c6
+      configured = c7 & applyMiddleware
+        (withLogging (\msg -> putStrLn $ "[probe:" <> unpack (probeName config) <> "] " <> unpack msg))
 
   req <- HTTP.parseRequest (unpack (httpUrl httpCfg))
   start <- getCurrentTime

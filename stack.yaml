@@ -2,8 +2,9 @@ snapshot: lts-23.18
 packages:
   - .
 extra-deps:
-  - http-tower-hs-0.2.0.0
-  - tower-hs-0.1.0.0
+  - http-tower-hs-0.3.0.0
+  - tower-hs-0.2.0.0
+  - profunctors-5.6.2
   - hs-opentelemetry-api-0.3.1.0
   - thread-utils-context-0.3.0.4
   - thread-utils-finalizers-0.1.1.0

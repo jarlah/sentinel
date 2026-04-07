@@ -12,7 +12,8 @@ import Data.Time.Clock (getCurrentTime)
 import qualified Network.HTTP.Client as HTTP
 import Test.Hspec
 
-import Network.HTTP.Tower (HttpResponse, newClient, (|>), withMock)
+import Data.Function ((&))
+import Network.HTTP.Tower (HttpResponse, newClient, applyMiddleware, withMock)
 
 import Sentinel.Alert.Resend (notifyWith, buildRequestBody)
 import Sentinel.Types
@@ -56,9 +57,9 @@ spec = describe "Resend alerting" $ do
     it "sends POST to the API URL" $ do
       recorder <- newIORef []
       client <- newClient
-      let mocked = client |> withMock (\req -> do
+      let mocked = client & applyMiddleware (withMock (\req -> do
             modifyIORef' recorder (req :)
-            pure (Right fakeOkResponse))
+            pure (Right fakeOkResponse)))
       now <- getCurrentTime
       notifyWith mocked cfg (ServiceDown "my-app" Nothing now)
       reqs <- readIORef recorder
@@ -68,9 +69,9 @@ spec = describe "Resend alerting" $ do
     it "includes Authorization header with API key" $ do
       recorder <- newIORef []
       client <- newClient
-      let mocked = client |> withMock (\req -> do
+      let mocked = client & applyMiddleware (withMock (\req -> do
             modifyIORef' recorder (req :)
-            pure (Right fakeOkResponse))
+            pure (Right fakeOkResponse)))
       now <- getCurrentTime
       notifyWith mocked cfg (ServiceDown "test" Nothing now)
       reqs <- readIORef recorder

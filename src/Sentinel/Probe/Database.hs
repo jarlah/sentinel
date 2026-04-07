@@ -5,6 +5,7 @@ module Sentinel.Probe.Database
   ) where
 
 import Control.Exception (SomeException, try)
+import Data.Function ((&))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text, unpack)
@@ -95,13 +96,12 @@ mkPingService kind = Service $ \() -> do
 -- | Apply tower-hs middleware (retry, timeout, circuit breaker) to a service.
 applyMiddleware :: ProbeConfig -> Map Text CircuitBreaker -> Service () () -> Service () ()
 applyMiddleware config breakers base =
-  let s1 = maybe base (\n -> withRetry (constantBackoff n 1.0) base) (probeRetries config)
-      s2 = maybe s1 (`withTimeout` s1) (probeTimeout config)
+  let s1 = maybe base (\n -> base & withRetry (constantBackoff n 1.0)) (probeRetries config)
+      s2 = maybe s1 (\ms -> s1 & withTimeout ms) (probeTimeout config)
       s3 = case (probeCircuitBreaker config, Map.lookup (probeName config) breakers) of
         (Just cbs, Just breaker) ->
-          withCircuitBreaker
+          s2 & withCircuitBreaker
             (CircuitBreakerConfig (cbsFailureThreshold cbs) (fromIntegral (cbsCooldownSeconds cbs)))
             breaker
-            s2
         _ -> s2
   in s3

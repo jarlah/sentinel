@@ -16,7 +16,8 @@ import Test.Hspec
 import qualified TestContainers as TC
 import TestContainers.Hspec (withContainers)
 
-import Network.HTTP.Tower (HttpResponse, newClient, (|>), withMock)
+import Data.Function ((&))
+import Network.HTTP.Tower (HttpResponse, newClient, applyMiddleware, withMock)
 
 import Sentinel.Alert.Prometheus (pushMetrics, pushMetricsWith, formatMetrics)
 import Sentinel.Types
@@ -43,9 +44,9 @@ spec = describe "Prometheus alerting" $ do
     it "sends POST to the correct pushgateway path" $ do
       recorder <- newIORef []
       client <- newClient
-      let mocked = client |> withMock (\req -> do
+      let mocked = client & applyMiddleware (withMock (\req -> do
             modifyIORef' recorder (req :)
-            pure (Right fakeOkResponse))
+            pure (Right fakeOkResponse)))
           cfg = PrometheusConfig
             { promPushgatewayUrl = "http://localhost:9091"
             , promJob = "sentinel"
@@ -59,9 +60,9 @@ spec = describe "Prometheus alerting" $ do
     it "sends text/plain content type" $ do
       recorder <- newIORef []
       client <- newClient
-      let mocked = client |> withMock (\req -> do
+      let mocked = client & applyMiddleware (withMock (\req -> do
             modifyIORef' recorder (req :)
-            pure (Right fakeOkResponse))
+            pure (Right fakeOkResponse)))
           cfg = PrometheusConfig "http://localhost:9091" "sentinel"
       pushMetricsWith mocked cfg "test" True 10.0
       reqs <- readIORef recorder

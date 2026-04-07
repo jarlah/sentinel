@@ -11,8 +11,9 @@ import Data.Text (Text, pack, unpack)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Network.HTTP.Client as HTTP
 
+import Data.Function ((&))
 import Network.HTTP.Tower
-  ( Client, newClient, runRequest, (|>)
+  ( Client, newClient, runRequest, applyMiddleware
   , withRetry, constantBackoff, withTimeout, withUserAgent
   )
 
@@ -28,10 +29,11 @@ push cfg event = do
 pushMetrics :: PrometheusConfig -> Text -> Bool -> Double -> IO ()
 pushMetrics cfg probeName isUp latency = do
   client <- newClient
-  let configured = client
-        |> withRetry (constantBackoff 2 1.0)
-        |> withTimeout 5000
-        |> withUserAgent "sentinel/0.1.0"
+  let configured = client & applyMiddleware
+        ( withRetry (constantBackoff 2 1.0)
+        . withTimeout 5000
+        . withUserAgent "sentinel/0.1.0"
+        )
   pushMetricsWith configured cfg probeName isUp latency
 
 -- | Push metrics using a provided client.
