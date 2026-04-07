@@ -6,7 +6,7 @@ import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
 import qualified Network.Wai.Handler.Warp as Warp
 import System.Environment (getArgs)
-import System.IO (hSetBuffering, stdout, stderr, LineBuffering)
+import System.IO (hSetBuffering, stdout, stderr, BufferMode(LineBuffering))
 
 import Sentinel.Api (app)
 import Sentinel.Config (loadConfig)
