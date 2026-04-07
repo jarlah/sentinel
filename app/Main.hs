@@ -6,6 +6,7 @@ import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
 import qualified Network.Wai.Handler.Warp as Warp
 import System.Environment (getArgs)
+import System.IO (hSetBuffering, stdout, stderr, LineBuffering)
 
 import Sentinel.Api (app)
 import Sentinel.Config (loadConfig)
@@ -14,6 +15,8 @@ import Sentinel.Types (AppConfig(..))
 
 main :: IO ()
 main = do
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stderr LineBuffering
   args <- getArgs
   let configPath = case args of
         (path:_) -> path
