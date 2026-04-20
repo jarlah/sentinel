@@ -77,27 +77,23 @@ runHttpProbe :: ProbeEnv -> AppConfig -> ProbeConfig -> HttpProbeConfig -> IO Pr
 runHttpProbe env appConfig config httpCfg = do
   let mClientCert = (,) <$> httpTlsClientCert httpCfg <*> httpTlsClientKey httpCfg
   client <- newClientWithTLS (httpTlsCaPath httpCfg) mClientCert
-  let base = client & applyMiddleware
-        ( withUserAgent userAgent
-        . withRequestId
-        )
-
-      c1 = foldl (\c (k, v) -> c & applyMiddleware (withHeader (CI.mk (encodeUtf8 k)) (encodeUtf8 v)))
-        base (httpHeaders httpCfg)
-      c2 = maybe c1 (\n -> c1 & applyMiddleware (withFollowRedirects n)) (httpFollowRedirects httpCfg)
-      c3 = maybe c2 (\n -> c2 & applyMiddleware (withRetry (constantBackoff n 1.0))) (probeRetries config)
-      c4 = maybe c3 (\ms -> c3 & applyMiddleware (withTimeout ms)) (probeTimeout config)
-      c5 = maybe c4 (\(lo, hi) -> c4 & applyMiddleware (withValidateStatus (\c -> c >= lo && c <= hi)))
-        (httpExpectedStatus httpCfg)
-      c6 = case (probeCircuitBreaker config, Map.lookup (probeName config) (probeEnvBreakers env)) of
-        (Just cbs, Just breaker) ->
-          c5 & applyMiddleware (withCircuitBreaker
-            (CircuitBreakerConfig (cbsFailureThreshold cbs) (fromIntegral (cbsCooldownSeconds cbs)))
-            breaker)
-        _ -> c5
-      c7 = if configTracing appConfig then c6 & applyMiddleware withTracing else c6
-      configured = c7 & applyMiddleware
-        (withLogging (\msg -> putStrLn $ "[probe:" <> unpack (probeName config) <> "] " <> unpack msg))
+  let cbPair = (,) <$> probeCircuitBreaker config
+                    <*> Map.lookup (probeName config) (probeEnvBreakers env)
+      configured = client
+        & applyMiddleware (withUserAgent userAgent . withRequestId)
+        & applyHeaders (httpHeaders httpCfg)
+        & withOpt (httpFollowRedirects httpCfg) withFollowRedirects
+        & withOpt (probeRetries config) (\n -> withRetry (constantBackoff n 1.0))
+        & withOpt (probeTimeout config) withTimeout
+        & withOpt (httpExpectedStatus httpCfg)
+            (\(lo, hi) -> withValidateStatus (\s -> s >= lo && s <= hi))
+        & withOpt cbPair
+            (\(cbs, breaker) -> withCircuitBreaker
+              (CircuitBreakerConfig (cbsFailureThreshold cbs) (fromIntegral (cbsCooldownSeconds cbs)))
+              breaker)
+        & (if configTracing appConfig then applyMiddleware withTracing else id)
+        & applyMiddleware
+            (withLogging (\msg -> putStrLn $ "[probe:" <> unpack (probeName config) <> "] " <> unpack msg))
 
   req <- HTTP.parseRequest (unpack (httpUrl httpCfg))
   start <- getCurrentTime
@@ -119,6 +115,9 @@ runHttpProbe env appConfig config httpCfg = do
       , resultError     = Just (displayError err)
       , resultCheckedAt = end
       }
+  where
+    withOpt mv f = maybe id (applyMiddleware . f) mv
+    applyHeaders hs c = foldl (\c' (k, v) -> c' & applyMiddleware (withHeader (CI.mk (encodeUtf8 k)) (encodeUtf8 v))) c hs
 
 -- | Start an infinite loop that probes at the configured interval.
 startProbeLoop :: ProbeEnv -> AppConfig -> TVar (Map Text ProbeResult) -> ProbeConfig -> IO ()

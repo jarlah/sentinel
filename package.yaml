@@ -1,5 +1,5 @@
 name: sentinel
-version: 0.1.0.0
+version: 0.2.1.0
 synopsis: Programmable infrastructure event platform
 description: |
   Sentinel monitors your services via HTTP health probes, using http-tower-hs
