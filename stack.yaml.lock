@@ -5,19 +5,19 @@
 
 packages:
 - completed:
-    hackage: http-tower-hs-0.3.0.0@sha256:388fc16d6b5e489931eecf970e83abcf13e83492db0a23d983873a05989c81f1,3629
+    hackage: http-tower-hs-0.3.1.0@sha256:5bd25c642025d7975478c2832b2b6661fefa0171c26db1698a323e500544a5f1,3629
     pantry-tree:
-      sha256: 3fab694498426d46a8c1900497e541c24fe10e8efa3d674a70841d9cb961e5b7
+      sha256: 2b18095d1857788140252dc1e53bb3e8c550e77516944e310ab03c88b73a645e
       size: 1935
   original:
-    hackage: http-tower-hs-0.3.0.0
+    hackage: http-tower-hs-0.3.1.0
 - completed:
-    hackage: tower-hs-0.2.0.0@sha256:326be7c977908780d735402a01b34f6bdacce126a648295cb507a64977f20002,2782
+    hackage: tower-hs-0.3.0.1@sha256:c7a38cdc9cfb40ddba7f3dadbd0c8be261af6d4c7d05870719ea5767b7438a14,2815
     pantry-tree:
-      sha256: c2b4951f55b12d05a3b2e136ebc02feef401a0ca45c6c2ae92558eb3c310d063
-      size: 2067
+      sha256: 7d317299824b9772975518d639c602224549a484a00aeaa4ab16483cc5b1acbc
+      size: 2068
   original:
-    hackage: tower-hs-0.2.0.0
+    hackage: tower-hs-0.3.0.1
 - completed:
     hackage: profunctors-5.6.2@sha256:e178ba4468982326656626e2089e296f64485e68fdddc9f4476dcd5d612b4f78,2484
     pantry-tree:
