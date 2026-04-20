@@ -14,24 +14,17 @@ import Data.Text.Encoding (encodeUtf8)
 import qualified Data.ByteString.Lazy as LBS
 import qualified Network.HTTP.Client as HTTP
 
-import Data.Function ((&))
 import Network.HTTP.Tower
-  ( Client, newClient, runRequest, applyMiddleware
-  , withRetry, constantBackoff, withTimeout, withUserAgent
+  ( Client, runRequest
   )
 
 import Sentinel.Types
-import Sentinel.Version (userAgent)
+import Sentinel.Client (makeAlertClient)
 
 -- | Send an alert via the Resend API using a default client.
 notify :: ResendConfig -> AlertEvent -> IO ()
 notify cfg event = do
-  client <- newClient
-  let configured = client & applyMiddleware
-        ( withRetry (constantBackoff 2 1.0)
-        . withTimeout 10000
-        . withUserAgent userAgent
-        )
+  configured <- makeAlertClient 10000
   notifyWith configured cfg event
 
 -- | Send an alert via the Resend API using a provided client.
@@ -61,12 +54,7 @@ buildRequestBody cfg event = encode $ object
 -- | Send a custom email via the Resend API.
 sendEmail :: ResendConfig -> Text -> Text -> IO ()
 sendEmail cfg emailSubject emailBody = do
-  client <- newClient
-  let configured = client & applyMiddleware
-        ( withRetry (constantBackoff 2 1.0)
-        . withTimeout 10000
-        . withUserAgent userAgent
-        )
+  configured <- makeAlertClient 10000
   sendEmailWith configured cfg emailSubject emailBody
 
 -- | Send a custom email via the Resend API using a provided client.

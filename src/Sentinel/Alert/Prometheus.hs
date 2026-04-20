@@ -11,14 +11,12 @@ import Data.Text (Text, pack, unpack)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Network.HTTP.Client as HTTP
 
-import Data.Function ((&))
 import Network.HTTP.Tower
-  ( Client, newClient, runRequest, applyMiddleware
-  , withRetry, constantBackoff, withTimeout, withUserAgent
+  ( Client, runRequest
   )
 
 import Sentinel.Types
-import Sentinel.Version (userAgent)
+import Sentinel.Client (makeAlertClient)
 
 -- | Push probe metrics to a Prometheus Pushgateway.
 push :: PrometheusConfig -> AlertEvent -> IO ()
@@ -29,12 +27,7 @@ push cfg event = do
 -- | Push metrics using a default client.
 pushMetrics :: PrometheusConfig -> Text -> Bool -> Double -> IO ()
 pushMetrics cfg probeName isUp latency = do
-  client <- newClient
-  let configured = client & applyMiddleware
-        ( withRetry (constantBackoff 2 1.0)
-        . withTimeout 5000
-        . withUserAgent userAgent
-        )
+  configured <- makeAlertClient 10000
   pushMetricsWith configured cfg probeName isUp latency
 
 -- | Push metrics using a provided client.
