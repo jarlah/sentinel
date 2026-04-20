@@ -63,10 +63,11 @@ instance FromJSON SlackConfig where
     <$> v .: "webhook_url"
 
 data ResendConfig = ResendConfig
-  { resendApiUrl :: !Text
-  , resendApiKey :: !Text
-  , resendFrom   :: !Text
-  , resendTo     :: ![Text]
+  { resendApiUrl        :: !Text
+  , resendApiKey        :: !Text
+  , resendFrom          :: !Text
+  , resendTo            :: ![Text]
+  , resendStatusReport  :: !Bool
   } deriving (Show, Generic)
 
 instance FromJSON ResendConfig where
@@ -75,6 +76,7 @@ instance FromJSON ResendConfig where
     <*> v .: "api_key"
     <*> v .: "from"
     <*> v .: "to"
+    <*> v .:? "status_report" .!= True
 
 data PrometheusConfig = PrometheusConfig
   { promPushgatewayUrl :: !Text

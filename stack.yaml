@@ -1,4 +1,11 @@
 snapshot: lts-23.18
+
+nix:
+  enable: true
+  packages:
+    - postgresql
+    - zlib
+    - pkg-config
 packages:
   - .
 extra-deps:

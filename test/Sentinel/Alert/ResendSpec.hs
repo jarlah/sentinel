@@ -25,6 +25,7 @@ spec = describe "Resend alerting" $ do
         , resendApiKey = "re_test"
         , resendFrom = "sentinel@example.com"
         , resendTo = ["oncall@example.com"]
+        , resendStatusReport = True
         }
 
   describe "buildRequestBody" $ do

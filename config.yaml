@@ -8,6 +8,7 @@ port: 8080
 #     api_key: "re_xxx"
 #     from: "sentinel@example.com"
 #     to: ["oncall@example.com"]
+#     status_report: true  # Send status report on Mondays and Fridays (default: true)
 #   prometheus:
 #     pushgateway_url: "http://localhost:9091"
 #     job: "sentinel"

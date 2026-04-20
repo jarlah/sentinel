@@ -39,13 +39,15 @@ import Network.HTTP.Tower
   )
 
 import Sentinel.Types
+import Sentinel.Version (userAgent)
 import Sentinel.Probe.Database (runDbProbe)
 import qualified Sentinel.Alert as Alert
 
 -- | Per-probe runtime state.
 data ProbeEnv = ProbeEnv
-  { probeEnvBreakers :: Map Text CircuitBreaker
-  , probeEnvStates   :: TVar (Map Text ProbeState)
+  { probeEnvBreakers  :: Map Text CircuitBreaker
+  , probeEnvStates    :: TVar (Map Text ProbeState)
+  , probeEnvEventLog  :: TVar [AlertEvent]
   }
 
 -- | Initialize runtime state for all probes.
@@ -53,9 +55,11 @@ initProbeEnv :: [ProbeConfig] -> IO ProbeEnv
 initProbeEnv configs = do
   breakers <- Map.fromList <$> mapM mkBreaker configs
   statesVar <- newTVarIO Map.empty
+  eventLog <- newTVarIO []
   pure ProbeEnv
-    { probeEnvBreakers = breakers
-    , probeEnvStates   = statesVar
+    { probeEnvBreakers  = breakers
+    , probeEnvStates    = statesVar
+    , probeEnvEventLog  = eventLog
     }
   where
     mkBreaker cfg = do
@@ -74,7 +78,7 @@ runHttpProbe env appConfig config httpCfg = do
   let mClientCert = (,) <$> httpTlsClientCert httpCfg <*> httpTlsClientKey httpCfg
   client <- newClientWithTLS (httpTlsCaPath httpCfg) mClientCert
   let base = client & applyMiddleware
-        ( withUserAgent "sentinel/0.1.0"
+        ( withUserAgent userAgent
         . withRequestId
         )
 
@@ -127,6 +131,10 @@ startProbeLoop env appConfig stateVar config = forever $ do
     Just alertCfg -> do
       states <- readTVarIO (probeEnvStates env)
       let prevState = Map.findWithDefault defaultProbeState (probeName config) states
+          event = Alert.detectEvent config prevState result (resultCheckedAt result)
+      case event of
+        Just evt -> atomically $ modifyTVar' (probeEnvEventLog env) (evt :)
+        Nothing  -> pure ()
       newState <- Alert.checkAndAlert alertCfg config prevState result
       atomically $ modifyTVar' (probeEnvStates env) (Map.insert (probeName config) newState)
     Nothing -> pure ()

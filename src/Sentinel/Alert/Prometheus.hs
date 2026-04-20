@@ -18,6 +18,7 @@ import Network.HTTP.Tower
   )
 
 import Sentinel.Types
+import Sentinel.Version (userAgent)
 
 -- | Push probe metrics to a Prometheus Pushgateway.
 push :: PrometheusConfig -> AlertEvent -> IO ()
@@ -32,7 +33,7 @@ pushMetrics cfg probeName isUp latency = do
   let configured = client & applyMiddleware
         ( withRetry (constantBackoff 2 1.0)
         . withTimeout 5000
-        . withUserAgent "sentinel/0.1.0"
+        . withUserAgent userAgent
         )
   pushMetricsWith configured cfg probeName isUp latency
 

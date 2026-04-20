@@ -4,6 +4,8 @@ module Sentinel.Alert.Resend
   ( notify
   , notifyWith
   , buildRequestBody
+  , sendEmail
+  , sendEmailWith
   ) where
 
 import Data.Aeson (encode, object, (.=))
@@ -19,6 +21,7 @@ import Network.HTTP.Tower
   )
 
 import Sentinel.Types
+import Sentinel.Version (userAgent)
 
 -- | Send an alert via the Resend API using a default client.
 notify :: ResendConfig -> AlertEvent -> IO ()
@@ -27,7 +30,7 @@ notify cfg event = do
   let configured = client & applyMiddleware
         ( withRetry (constantBackoff 2 1.0)
         . withTimeout 10000
-        . withUserAgent "sentinel/0.1.0"
+        . withUserAgent userAgent
         )
   notifyWith configured cfg event
 
@@ -54,6 +57,38 @@ buildRequestBody cfg event = encode $ object
   , "subject" .= subject event
   , "html"    .= htmlBody event
   ]
+
+-- | Send a custom email via the Resend API.
+sendEmail :: ResendConfig -> Text -> Text -> IO ()
+sendEmail cfg emailSubject emailBody = do
+  client <- newClient
+  let configured = client & applyMiddleware
+        ( withRetry (constantBackoff 2 1.0)
+        . withTimeout 10000
+        . withUserAgent userAgent
+        )
+  sendEmailWith configured cfg emailSubject emailBody
+
+-- | Send a custom email via the Resend API using a provided client.
+sendEmailWith :: Client -> ResendConfig -> Text -> Text -> IO ()
+sendEmailWith client cfg emailSubject emailBody = do
+  initReq <- HTTP.parseRequest (unpack (resendApiUrl cfg))
+  let body = encode $ object
+        [ "from"    .= resendFrom cfg
+        , "to"      .= resendTo cfg
+        , "subject" .= emailSubject
+        , "html"    .= emailBody
+        ]
+      req = initReq
+        { HTTP.method = "POST"
+        , HTTP.requestBody = HTTP.RequestBodyLBS body
+        , HTTP.requestHeaders =
+            [ ("Content-Type", "application/json")
+            , ("Authorization", "Bearer " <> encodeUtf8 (resendApiKey cfg))
+            ]
+        }
+  _ <- runRequest client req
+  pure ()
 
 subject :: AlertEvent -> Text
 subject (ServiceDown name _ _)      = "[Sentinel] " <> name <> " is DOWN"

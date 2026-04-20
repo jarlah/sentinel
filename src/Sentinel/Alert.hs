@@ -3,6 +3,7 @@
 module Sentinel.Alert
   ( checkAndAlert
   , dispatch
+  , detectEvent
   ) where
 
 import Control.Concurrent (forkIO)

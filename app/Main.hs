@@ -10,8 +10,9 @@ import System.IO (hSetBuffering, stdout, stderr, BufferMode(LineBuffering))
 
 import Sentinel.Api (app)
 import Sentinel.Config (loadConfig)
-import Sentinel.Probe (startProbeLoop, initProbeEnv)
-import Sentinel.Types (AppConfig(..))
+import Sentinel.Probe (startProbeLoop, initProbeEnv, ProbeEnv(..))
+import Sentinel.Report (startReportLoop)
+import Sentinel.Types (AppConfig(..), AlertingConfig(..), ResendConfig(..))
 
 main :: IO ()
 main = do
@@ -34,5 +35,11 @@ main = do
   let probes = configProbes config
       server = Warp.run (configPort config) (app stateVar)
       probeLoops = mapConcurrently_ (startProbeLoop env config stateVar) probes
+      reportLoop = case configAlerting config of
+        Just alertCfg -> case alertResend alertCfg of
+          Just resendCfg | resendStatusReport resendCfg ->
+            startReportLoop resendCfg stateVar (probeEnvEventLog env)
+          _ -> pure ()
+        _ -> pure ()
 
-  mapConcurrently_ id [server, probeLoops]
+  mapConcurrently_ id [server, probeLoops, reportLoop]

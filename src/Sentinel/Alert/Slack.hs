@@ -18,6 +18,7 @@ import Network.HTTP.Tower
   )
 
 import Sentinel.Types
+import Sentinel.Version (userAgent)
 
 -- | Post an alert to a Slack webhook using a default client.
 notify :: SlackConfig -> AlertEvent -> IO ()
@@ -26,7 +27,7 @@ notify cfg event = do
   let configured = client & applyMiddleware
         ( withRetry (constantBackoff 2 1.0)
         . withTimeout 5000
-        . withUserAgent "sentinel/0.1.0"
+        . withUserAgent userAgent
         )
   notifyWith configured cfg event
 
