@@ -72,7 +72,7 @@ probes:
     url: "https://myapp.example.com/health"
 ```
 
-This gives each probe: User-Agent (`sentinel/0.1.0`), a unique request ID, and logging. No retry, no timeout, no validation — just a raw health check.
+This gives each probe: User-Agent (`sentinel/<version>`), a unique request ID, and logging. No retry, no timeout, no validation — just a raw health check.
 
 ### Full
 
@@ -87,6 +87,7 @@ alerting:
     api_key: "re_xxx"
     from: "sentinel@example.com"
     to: ["oncall@example.com"]
+    status_report: true
   prometheus:
     pushgateway_url: "http://localhost:9091"
 
@@ -232,6 +233,7 @@ alerting:
 | `alerting.resend.api_key` | Resend API key |
 | `alerting.resend.from` | Sender email address |
 | `alerting.resend.to` | List of recipient email addresses |
+| `alerting.resend.status_report` | Send status report emails on Mondays and Fridays (default: `true`) |
 | `alerting.prometheus.pushgateway_url` | Prometheus Pushgateway URL |
 | `alerting.prometheus.job` | Job label for pushed metrics (default: `sentinel`) |
 
@@ -261,6 +263,26 @@ sentinel_probe_latency_ms{probe="my-app"} 89.4
 
 Use Alertmanager rules on these metrics for more advanced alerting workflows.
 
+### Status reports
+
+When Resend email is configured, Sentinel sends a status report email every Monday and Friday at 8 AM (local server time). This provides assurance that the service is running at the start and end of each work week.
+
+- **No downtime**: Subject line "[Sentinel] Status Report — No downtime" with a confirmation that all services have been operational since the last report.
+- **Downtime detected**: Subject line "[Sentinel] Status Report — Downtime detected" with a list of all incidents (down, still down, recovered) since the last report.
+
+Both reports include a table of current probe statuses with name, status, latency, and last check time.
+
+Status reports are enabled by default. To disable:
+
+```yaml
+alerting:
+  resend:
+    api_key: "re_xxx"
+    from: "sentinel@example.com"
+    to: ["oncall@example.com"]
+    status_report: false
+```
+
 ## Middleware stack
 
 Sentinel uses composable middleware from [tower-hs](https://github.com/jarlah/tower-hs) for all probe types.
@@ -278,7 +300,7 @@ User-Agent ─> Request ID ─> Headers ─> Redirects ─> Retry ─> Timeout �
 -- What sentinel builds under the hood for HTTP probes:
 client <- newClientWithTLS maybeCaPath maybeClientCert
 let configured = client
-      |> withUserAgent "sentinel/0.1.0"
+      |> withUserAgent "sentinel/<version>"
       |> withRequestId
       |> withHeader "Authorization" "Bearer my-token"
       |> withFollowRedirects 5
